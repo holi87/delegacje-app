@@ -35,7 +35,7 @@ async function buildApp() {
   await app.register(authPlugin);
 
   // Error handler
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: any, request, reply) => {
     if (error instanceof AppError) {
       return reply.status(error.statusCode).send({
         statusCode: error.statusCode,
@@ -51,7 +51,7 @@ async function buildApp() {
         statusCode: 422,
         error: 'Validation Error',
         message: 'Błąd walidacji danych',
-        details: error.validation.map((v) => ({
+        details: error.validation.map((v: any) => ({
           field: v.instancePath || v.params?.missingProperty || 'unknown',
           message: v.message || 'Nieprawidłowa wartość',
         })),
