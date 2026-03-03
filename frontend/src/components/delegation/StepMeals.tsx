@@ -27,6 +27,32 @@ interface DelegationDay {
   dateLabel: string;
 }
 
+function calculateNightsCount(departureAt: string, returnAt: string): number {
+  if (!departureAt || !returnAt) return 0;
+
+  const dep = new Date(departureAt);
+  const ret = new Date(returnAt);
+
+  if (isNaN(dep.getTime()) || isNaN(ret.getTime()) || ret <= dep) return 0;
+
+  const depDate = new Date(dep);
+  depDate.setHours(0, 0, 0, 0);
+
+  const retDate = new Date(ret);
+  retDate.setHours(0, 0, 0, 0);
+
+  if (depDate.getTime() === retDate.getTime()) return 0;
+
+  let count = 0;
+  const current = new Date(depDate);
+  while (current < retDate) {
+    count += 1;
+    current.setDate(current.getDate() + 1);
+  }
+
+  return count;
+}
+
 function isForeignSegmentInDay(
   dayStart: Date,
   dayEnd: Date,
@@ -113,9 +139,15 @@ export function StepMeals() {
   const borderCrossingIn = watch('borderCrossingIn');
   const days = watch('days');
   const delegationType = watch('type');
+  const accommodationType = watch('accommodationType');
+  const globalAccommodationType = accommodationType ?? 'NONE';
 
   const delegationDays = useMemo(
     () => calculateDelegationDays(departureAt, returnAt),
+    [departureAt, returnAt]
+  );
+  const nightsCount = useMemo(
+    () => calculateNightsCount(departureAt, returnAt),
     [departureAt, returnAt]
   );
 
@@ -133,6 +165,9 @@ export function StepMeals() {
         !!borderCrossingOut &&
         !!borderCrossingIn &&
         isForeignSegmentInDay(dd.startDate, dd.endDate, borderCrossingOut, borderCrossingIn);
+      const isAccommodationNight = idx < nightsCount;
+      const resolvedAccommodationType = existing?.accommodationType
+        ?? (isAccommodationNight ? globalAccommodationType : 'NONE');
 
       return {
         dayNumber: dd.dayNumber,
@@ -140,8 +175,11 @@ export function StepMeals() {
         breakfastProvided: existing?.breakfastProvided ?? false,
         lunchProvided: existing?.lunchProvided ?? false,
         dinnerProvided: existing?.dinnerProvided ?? false,
-        accommodationType: existing?.accommodationType ?? 'NONE' as const,
-        accommodationCost: existing?.accommodationCost ?? null,
+        accommodationType: resolvedAccommodationType,
+        accommodationCost:
+          resolvedAccommodationType === 'RECEIPT'
+            ? (existing?.accommodationCost ?? null)
+            : null,
         isForeign: delegationType === 'FOREIGN' ? autoForeign : false,
       };
     });
@@ -153,7 +191,9 @@ export function StepMeals() {
         (d, i) =>
           d.dayNumber !== currentDays[i]?.dayNumber ||
           d.date !== currentDays[i]?.date ||
-          d.isForeign !== currentDays[i]?.isForeign
+          d.isForeign !== currentDays[i]?.isForeign ||
+          d.accommodationType !== currentDays[i]?.accommodationType ||
+          (d.accommodationCost ?? null) !== (currentDays[i]?.accommodationCost ?? null)
       )
     ) {
       setValue('days', newDays);
@@ -162,6 +202,8 @@ export function StepMeals() {
     delegationDays.length,
     departureAt,
     returnAt,
+    accommodationType,
+    nightsCount,
     delegationType,
     borderCrossingOut,
     borderCrossingIn,
