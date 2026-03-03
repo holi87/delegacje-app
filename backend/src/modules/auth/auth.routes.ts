@@ -41,7 +41,7 @@ export async function authRoutes(app: FastifyInstance) {
       { expiresIn: '15m' }
     );
 
-    const refreshToken = app.jwtRefresh.sign(
+    const refreshToken = app.jwt.refresh.sign(
       { userId: user.id, role: user.role },
       { expiresIn: '7d' }
     );
@@ -82,7 +82,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     try {
-      const decoded = app.jwtRefresh.verify<{ userId: string; role: string }>(token);
+      const decoded = app.jwt.refresh.verify<{ userId: string; role: string }>(token);
       const user = await app.prisma.user.findUnique({
         where: { id: decoded.userId },
       });
@@ -101,7 +101,7 @@ export async function authRoutes(app: FastifyInstance) {
       );
 
       // Refresh token rotation: issue a new refresh token on every refresh
-      const newRefreshToken = app.jwtRefresh.sign(
+      const newRefreshToken = app.jwt.refresh.sign(
         { userId: user.id, role: user.role },
         { expiresIn: '7d' }
       );

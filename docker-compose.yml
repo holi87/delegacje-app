@@ -25,17 +25,19 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       NODE_ENV: production
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8250}
     ports:
       - "3001:3001"
 
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     depends_on:
       - backend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "8250:80"
 
 volumes:
   pgdata:

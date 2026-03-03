@@ -35,6 +35,16 @@ Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i
 - Docker + Docker Compose
 - Node.js 20+ (do developmentu lokalnego)
 
+### Ważne: seed stawek (w tym zagranicznych)
+
+Po uruchomieniu kontenerów wykonaj:
+
+```bash
+docker compose exec backend npx prisma db seed
+```
+
+To polecenie uzupełnia słownik stawek zagranicznych (`foreign_diet_rates`) oraz stawki domyślne.
+
 ### Uruchomienie (Docker — dev)
 
 ```bash
@@ -58,12 +68,12 @@ EOF
 # 2. Uruchom
 docker compose up -d --build
 
-# 3. (Opcjonalnie) seed domyślnych stawek
+# 3. Seed stawek (w tym zagranicznych)
 docker compose exec backend npx prisma db seed
 ```
 
 Aplikacja:
-- Frontend: http://localhost:3000
+- Frontend: http://localhost:8250
 - Backend API: http://localhost:3001
 - Health check: http://localhost:3001/api/v1/health
 - Przy pierwszym uruchomieniu pojawi się **Setup Wizard** — skonfiguruj firmę i konto admina.
@@ -107,7 +117,7 @@ npm run dev
 | `PORT` | Port backendu | `3001` |
 | `HOST` | Adres nasłuchiwania | `0.0.0.0` |
 | `NODE_ENV` | Środowisko | `development` / `production` |
-| `CORS_ORIGIN` | URL frontendu (CORS) | `http://localhost:5173` |
+| `CORS_ORIGIN` | URL frontendu (CORS) | `http://localhost:8250` |
 
 ### Zmienne środowiskowe — Frontend
 

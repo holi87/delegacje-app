@@ -10,13 +10,17 @@ declare module '@fastify/jwt' {
   }
 }
 
-declare module 'fastify' {
-  interface FastifyInstance {
-    jwtRefresh: {
+declare module '@fastify/jwt' {
+  interface JWT {
+    refresh: {
       sign: (payload: object, options?: object) => string;
       verify: <T = { userId: string; role: string }>(token: string) => T;
     };
   }
+}
+
+declare module 'fastify' {
+  interface FastifyInstance {}
 }
 
 async function authPlugin(fastify: FastifyInstance) {
