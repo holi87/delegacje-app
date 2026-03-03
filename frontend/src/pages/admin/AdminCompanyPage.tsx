@@ -1,10 +1,199 @@
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getCompanyInfo, updateCompanyInfo } from '@/api/admin';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { toast } from 'sonner';
+import { Loader2, Save } from 'lucide-react';
+import type { CompanyInfo } from '../../../../shared/types';
+
+// --- Schema ---
+
+const companySchema = z.object({
+  name: z.string().min(1, 'Nazwa firmy jest wymagana'),
+  nip: z
+    .string()
+    .min(1, 'NIP jest wymagany')
+    .regex(/^\d{10}$/, 'NIP musi skladac sie z 10 cyfr'),
+  address: z.string().min(1, 'Adres jest wymagany'),
+  postalCode: z
+    .string()
+    .min(1, 'Kod pocztowy jest wymagany')
+    .regex(/^\d{2}-\d{3}$/, 'Format kodu pocztowego: XX-XXX'),
+  city: z.string().min(1, 'Miasto jest wymagane'),
+});
+
+type CompanyFormData = z.infer<typeof companySchema>;
+
+// --- Component ---
+
 export default function AdminCompanyPage() {
+  const queryClient = useQueryClient();
+
+  const { data: companyData, isLoading } = useQuery({
+    queryKey: ['admin', 'company'],
+    queryFn: getCompanyInfo,
+  });
+
+  const company: CompanyInfo | null = companyData ?? null;
+
+  const form = useForm<CompanyFormData>({
+    resolver: zodResolver(companySchema),
+    defaultValues: {
+      name: '',
+      nip: '',
+      address: '',
+      postalCode: '',
+      city: '',
+    },
+  });
+
+  useEffect(() => {
+    if (company) {
+      form.reset({
+        name: company.name,
+        nip: company.nip,
+        address: company.address,
+        postalCode: company.postalCode,
+        city: company.city,
+      });
+    }
+  }, [company, form]);
+
+  const updateMutation = useMutation({
+    mutationFn: (data: CompanyFormData) => updateCompanyInfo(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'company'] });
+      toast.success('Dane firmy zostaly zaktualizowane');
+    },
+    onError: () => {
+      toast.error('Nie udalo sie zaktualizowac danych firmy');
+    },
+  });
+
+  function onSubmit(data: CompanyFormData) {
+    updateMutation.mutate(data);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="text-2xl font-bold">Dane firmy</h1>
-      <p className="mt-2 text-muted-foreground">
-        Edycja danych firmy — w budowie.
-      </p>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Informacje o firmie</CardTitle>
+          <CardDescription>
+            Dane firmy wyswietlane na dokumentach i rozliczeniach delegacji.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="company-name">Nazwa firmy</Label>
+              <Input
+                id="company-name"
+                placeholder="Nazwa spolki z o.o."
+                {...form.register('name')}
+              />
+              {form.formState.errors.name && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.name.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="company-nip">NIP</Label>
+              <Input
+                id="company-nip"
+                placeholder="1234567890"
+                maxLength={10}
+                {...form.register('nip')}
+              />
+              {form.formState.errors.nip && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.nip.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="company-address">Adres</Label>
+              <Input
+                id="company-address"
+                placeholder="ul. Przykladowa 1/2"
+                {...form.register('address')}
+              />
+              {form.formState.errors.address && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.address.message}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="company-postalCode">Kod pocztowy</Label>
+                <Input
+                  id="company-postalCode"
+                  placeholder="00-000"
+                  maxLength={6}
+                  {...form.register('postalCode')}
+                />
+                {form.formState.errors.postalCode && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.postalCode.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="company-city">Miasto</Label>
+                <Input
+                  id="company-city"
+                  placeholder="Warszawa"
+                  {...form.register('city')}
+                />
+                {form.formState.errors.city && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.city.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Zapisz zmiany
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
