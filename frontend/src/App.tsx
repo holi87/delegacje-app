@@ -8,6 +8,7 @@ import LoginPage from '@/pages/LoginPage';
 import SetupWizardPage from '@/pages/SetupWizardPage';
 import DashboardPage from '@/pages/DashboardPage';
 import NewDelegationPage from '@/pages/NewDelegationPage';
+import EditDelegationPage from '@/pages/EditDelegationPage';
 import DelegationDetailPage from '@/pages/DelegationDetailPage';
 import ProfilePage from '@/pages/ProfilePage';
 import NotFoundPage from '@/pages/NotFoundPage';
@@ -82,6 +83,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/delegations/new" element={<NewDelegationPage />} />
+            <Route path="/delegations/:id/edit" element={<EditDelegationPage />} />
             <Route path="/delegations/:id" element={<DelegationDetailPage />} />
             <Route path="/profile" element={<ProfilePage />} />
 

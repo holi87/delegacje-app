@@ -260,7 +260,7 @@ export default function DelegationDetailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(`/delegations/new`)}
+                onClick={() => navigate(`/delegations/${id}/edit`)}
                 disabled={isMutating}
               >
                 <Pencil className="mr-1 h-4 w-4" />
