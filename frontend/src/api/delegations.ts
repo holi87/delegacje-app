@@ -41,7 +41,7 @@ export async function reopenDelegation(id: string) {
 
 export async function calculateDelegation(id: string) {
   const response = await apiClient.post(`/delegations/${id}/calculate`);
-  return response.data;
+  return response.data?.calculation ?? response.data;
 }
 
 export async function downloadDelegationPdf(id: string) {
