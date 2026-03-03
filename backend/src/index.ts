@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { loadEnv } from './config/env.js';
 import prismaPlugin from './plugins/prisma.js';
 import corsPlugin from './plugins/cors.js';
+import rateLimitPlugin from './plugins/rate-limit.js';
 import authPlugin from './plugins/auth.js';
 import { setupRoutes } from './modules/setup/setup.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
@@ -32,6 +33,7 @@ async function buildApp() {
   // Plugins
   await app.register(prismaPlugin);
   await app.register(corsPlugin);
+  await app.register(rateLimitPlugin);
   await app.register(authPlugin);
 
   // Error handler
@@ -76,8 +78,15 @@ async function buildApp() {
   await app.register(companyRoutes, { prefix: '/api/v1/admin/company' });
   await app.register(pdfRoutes, { prefix: '/api/v1/delegations' });
 
-  // Health check
-  app.get('/api/v1/health', async () => ({ status: 'ok' }));
+  // Health check — verifies DB connectivity
+  app.get('/api/v1/health', async () => {
+    try {
+      await app.prisma.$queryRaw`SELECT 1`;
+      return { status: 'ok', database: 'connected' };
+    } catch {
+      return { status: 'degraded', database: 'disconnected' };
+    }
+  });
 
   return app;
 }

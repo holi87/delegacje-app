@@ -3,12 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { checkSetupStatus } from '@/api/auth';
 import { useAuthStore } from '@/stores/authStore';
 import { AppShell } from '@/components/layout/AppShell';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import LoginPage from '@/pages/LoginPage';
 import SetupWizardPage from '@/pages/SetupWizardPage';
 import DashboardPage from '@/pages/DashboardPage';
 import NewDelegationPage from '@/pages/NewDelegationPage';
 import DelegationDetailPage from '@/pages/DelegationDetailPage';
 import ProfilePage from '@/pages/ProfilePage';
+import NotFoundPage from '@/pages/NotFoundPage';
 import AdminRatesPage from '@/pages/admin/AdminRatesPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 import AdminCompanyPage from '@/pages/admin/AdminCompanyPage';
@@ -62,35 +64,39 @@ export default function App() {
 
   if (setupStatus?.needsSetup) {
     return (
-      <>
-        <SetupWizardPage />
-        <Toaster position="top-right" richColors />
-      </>
+      <ErrorBoundary>
+        <>
+          <SetupWizardPage />
+          <Toaster position="top-right" richColors />
+        </>
+      </ErrorBoundary>
     );
   }
 
   return (
-    <>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
+    <ErrorBoundary>
+      <>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/delegations/new" element={<NewDelegationPage />} />
-          <Route path="/delegations/:id" element={<DelegationDetailPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/delegations/new" element={<NewDelegationPage />} />
+            <Route path="/delegations/:id" element={<DelegationDetailPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
 
-          <Route element={<AdminRoute />}>
-            <Route path="/admin/rates" element={<AdminRatesPage />} />
-            <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin/company" element={<AdminCompanyPage />} />
-            <Route path="/admin/delegations" element={<AdminDelegationsPage />} />
+            <Route element={<AdminRoute />}>
+              <Route path="/admin/rates" element={<AdminRatesPage />} />
+              <Route path="/admin/users" element={<AdminUsersPage />} />
+              <Route path="/admin/company" element={<AdminCompanyPage />} />
+              <Route path="/admin/delegations" element={<AdminDelegationsPage />} />
+            </Route>
           </Route>
-        </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <Toaster position="top-right" richColors />
-    </>
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+        <Toaster position="top-right" richColors />
+      </>
+    </ErrorBoundary>
   );
 }

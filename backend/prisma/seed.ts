@@ -22,16 +22,18 @@ async function seedDefaultRates() {
     console.log('Seeded domestic rates');
   }
 
-  const mileageCount = await prisma.mileageRate.count();
-  if (mileageCount === 0) {
-    const mileageRates = [
-      { vehicleType: 'CAR_ABOVE_900' as const, ratePerKm: 1.15 },
-      { vehicleType: 'CAR_BELOW_900' as const, ratePerKm: 0.89 },
-      { vehicleType: 'MOTORCYCLE' as const, ratePerKm: 0.69 },
-      { vehicleType: 'MOPED' as const, ratePerKm: 0.42 },
-    ];
+  const mileageRates = [
+    { vehicleType: 'CAR_ABOVE_900' as const, ratePerKm: 1.15 },
+    { vehicleType: 'CAR_BELOW_900' as const, ratePerKm: 0.89 },
+    { vehicleType: 'MOTORCYCLE' as const, ratePerKm: 0.69 },
+    { vehicleType: 'MOPED' as const, ratePerKm: 0.42 },
+  ];
 
-    for (const rate of mileageRates) {
+  for (const rate of mileageRates) {
+    const existing = await prisma.mileageRate.findFirst({
+      where: { vehicleType: rate.vehicleType, validTo: null },
+    });
+    if (!existing) {
       await prisma.mileageRate.create({
         data: {
           vehicleType: rate.vehicleType,
@@ -40,8 +42,8 @@ async function seedDefaultRates() {
           validTo: null,
         },
       });
+      console.log(`Seeded mileage rate: ${rate.vehicleType}`);
     }
-    console.log('Seeded mileage rates');
   }
 }
 

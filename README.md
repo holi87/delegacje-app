@@ -4,16 +4,19 @@ Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i
 
 ## Funkcje
 
-- Tworzenie i rozliczanie delegacji krajowych (Faza 1)
+- Tworzenie i rozliczanie delegacji krajowych i zagranicznych
 - Obliczanie diet wg aktualnych stawek (konfigurowalne w panelu admina)
+- Delegacje zagraniczne: dwuodcinkowy model (krajowy + zagraniczny), stawki per kraj
 - Kilometrówka z wyborem typu pojazdu
 - Rozliczanie noclegów (wg rachunku / ryczałt)
 - Koszty dodatkowe (parkingi, autostrady, inne)
 - Pomniejszanie diet za zapewnione posiłki
 - Generowanie PDF z pełnym rozliczeniem (do podpisu)
-- Panel administracyjny (stawki, użytkownicy, dane firmy)
+- Panel administracyjny (stawki krajowe i zagraniczne, użytkownicy, dane firmy)
 - Setup Wizard — konfiguracja przy pierwszym uruchomieniu (bez domyślnego admina w kodzie)
 - Reset hasła admina z poziomu serwera (CLI)
+- Rate limiting na API (ochrona przed brute force)
+- Security headers (nginx)
 
 ## Stack technologiczny
 
@@ -32,24 +35,44 @@ Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i
 - Docker + Docker Compose
 - Node.js 20+ (do developmentu lokalnego)
 
-### Uruchomienie (Docker)
+### Uruchomienie (Docker — dev)
 
 ```bash
-# Klonuj repo
 git clone <repo-url>
 cd delegacje-app
 
-# Uruchom (dev)
 docker compose -f docker-compose.dev.yml up -d
+```
 
-# Lub produkcja
+### Wdrożenie produkcyjne (Docker)
+
+```bash
+# 1. Przygotuj zmienne środowiskowe
+cat > .env <<EOF
+DB_PASSWORD=$(openssl rand -base64 24)
+JWT_SECRET=$(openssl rand -base64 48)
+JWT_REFRESH_SECRET=$(openssl rand -base64 48)
+CORS_ORIGIN=https://delegacje.twoja-domena.pl
+EOF
+
+# 2. Uruchom
 docker compose up -d --build
+
+# 3. (Opcjonalnie) seed domyślnych stawek
+docker compose exec backend npx prisma db seed
 ```
 
 Aplikacja:
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:3001
+- Health check: http://localhost:3001/api/v1/health
 - Przy pierwszym uruchomieniu pojawi się **Setup Wizard** — skonfiguruj firmę i konto admina.
+
+**Uwagi produkcyjne:**
+- Przed frontendem postaw reverse proxy (nginx/Caddy) z SSL
+- PostgreSQL healthcheck wbudowany w docker-compose — backend startuje po gotowości DB
+- Rate limiting: 100 req/min globalnie, 5 req/15min na login
+- Refresh tokeny rotowane przy każdym odświeżeniu (osobny sekret)
 
 ### Uruchomienie lokalne (dev)
 
@@ -79,17 +102,27 @@ npm run dev
 | Zmienna | Opis | Przykład |
 |---------|------|---------|
 | `DATABASE_URL` | Connection string PostgreSQL | `postgresql://user:pass@db:5432/delegacje` |
-| `JWT_SECRET` | Klucz do podpisu JWT | `losowy-ciag-min-32-znaki` |
-| `JWT_ACCESS_EXPIRY` | Ważność access tokena | `15m` |
-| `JWT_REFRESH_EXPIRY` | Ważność refresh tokena | `7d` |
+| `JWT_SECRET` | Klucz do podpisu JWT (min 32 znaki) | `openssl rand -base64 48` |
+| `JWT_REFRESH_SECRET` | Klucz do podpisu refresh tokenów (min 32 znaki) | `openssl rand -base64 48` |
 | `PORT` | Port backendu | `3001` |
-| `SEED_DEMO` | Seed: dane demo (dev) | `true` / `false` |
+| `HOST` | Adres nasłuchiwania | `0.0.0.0` |
+| `NODE_ENV` | Środowisko | `development` / `production` |
+| `CORS_ORIGIN` | URL frontendu (CORS) | `http://localhost:5173` |
 
 ### Zmienne środowiskowe — Frontend
 
 | Zmienna | Opis | Przykład |
 |---------|------|---------|
-| `VITE_API_URL` | URL backendu | `http://localhost:3001/api/v1` |
+| `VITE_API_URL` | URL backendu (tylko dev lokalny) | `http://localhost:3001/api/v1` |
+
+### Zmienne środowiskowe — Docker Compose (produkcja)
+
+| Zmienna | Opis | Przykład |
+|---------|------|---------|
+| `DB_PASSWORD` | Hasło PostgreSQL | silne losowe hasło |
+| `JWT_SECRET` | Klucz JWT (min 32 znaki) | `openssl rand -base64 48` |
+| `JWT_REFRESH_SECRET` | Klucz refresh JWT (min 32 znaki) | `openssl rand -base64 48` |
+| `CORS_ORIGIN` | URL frontendu | `https://delegacje.firma.pl` |
 
 ## Pierwsze uruchomienie — Setup Wizard
 
@@ -177,8 +210,9 @@ Stawki konfigurowane przez admina — przy zmianie przepisów wystarczy zaktuali
 
 ## Plan rozwoju
 
-- **Faza 1** (obecna): Delegacje krajowe
-- **Faza 2**: Delegacje zagraniczne (słownik diet wg krajów, przeliczanie walut)
+- **Faza 1** (zrealizowana): Delegacje krajowe
+- **Faza 2** (zrealizowana): Delegacje zagraniczne (48 krajów, dwuodcinkowy model)
+- **Faza 3** (planowana): Eksport do księgowości, powiadomienia email
 
 ## Licencja
 
@@ -189,6 +223,24 @@ Własnościowa / wewnętrzna. Do użytku w ramach spółki.
 ## Changelog
 
 ### [Unreleased]
+- Faza 2: Delegacje zagraniczne
+  - Dwuodcinkowy model obliczania (odcinek krajowy + zagraniczny)
+  - 48 krajów z oficjalnymi stawkami diet i limitami noclegów
+  - Progi godzinowe zagraniczne: ≤8h = 1/3, 8-12h = 1/2, >12h = 100%
+  - Pomniejszenia za posiłki zagraniczne: 15% / 30% / 30%
+  - CRUD stawek zagranicznych w panelu admina
+  - Wizard: wybór typu delegacji, kraju, czasów przekroczenia granicy
+  - PDF: warunkowy layout zagraniczny ze split-tabelą diet
+  - 38 testów jednostkowych dla obliczeń zagranicznych (69 łącznie)
+- Hardening produkcyjny:
+  - Rate limiting (100 req/min globalnie, 5 req/15min na login)
+  - Rotacja refresh tokenów + osobny sekret JWT
+  - Nginx security headers (X-Frame-Options, X-Content-Type-Options, etc.)
+  - Health check z weryfikacją połączenia z bazą danych
+  - Error Boundary w React + strona 404
+  - Docker: PostgreSQL healthcheck, parametryzowalny CORS_ORIGIN
+  - Pliki .env.example dla backend i frontend
+  - Seed idempotentny per-rekord (odporny na partial failure)
 - Setup Wizard przy pierwszym uruchomieniu (zamiast domyślnego admina w seedzie)
 - CLI do resetu hasła admina (`reset-password.ts`)
 - Faza 1: Pełne rozliczenie delegacji krajowych
@@ -200,10 +252,10 @@ Własnościowa / wewnętrzna. Do użytku w ramach spółki.
   - Zaliczki
   - Generowanie PDF z rozliczeniem (server-side, PDFKit)
   - Panel administracyjny:
-    - Zarządzanie stawkami (diety, kilometrówka) z datą obowiązywania
+    - Zarządzanie stawkami (diety krajowe, zagraniczne, kilometrówka)
     - Zarządzanie użytkownikami
     - Dane firmy (nagłówek PDF)
     - Podgląd i rozliczanie delegacji
-  - Autentykacja JWT (access + refresh token)
+  - Autentykacja JWT (access + refresh token z rotacją)
   - Role: Admin / Delegowany
   - Docker + docker-compose (dev + prod)

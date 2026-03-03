@@ -4,7 +4,16 @@ import { validateCredentials } from './auth.service.js';
 import { authenticate } from '../../middleware/authenticate.js';
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post('/login', async (request, reply) => {
+  const loginRateLimit = {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '15 minutes',
+      },
+    },
+  };
+
+  app.post('/login', loginRateLimit, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(422).send({
@@ -32,7 +41,7 @@ export async function authRoutes(app: FastifyInstance) {
       { expiresIn: '15m' }
     );
 
-    const refreshToken = app.jwt.sign(
+    const refreshToken = app.jwtRefresh.sign(
       { userId: user.id, role: user.role },
       { expiresIn: '7d' }
     );
@@ -73,7 +82,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     try {
-      const decoded = app.jwt.verify<{ userId: string; role: string }>(token);
+      const decoded = app.jwtRefresh.verify<{ userId: string; role: string }>(token);
       const user = await app.prisma.user.findUnique({
         where: { id: decoded.userId },
       });
@@ -90,6 +99,20 @@ export async function authRoutes(app: FastifyInstance) {
         { userId: user.id, role: user.role },
         { expiresIn: '15m' }
       );
+
+      // Refresh token rotation: issue a new refresh token on every refresh
+      const newRefreshToken = app.jwtRefresh.sign(
+        { userId: user.id, role: user.role },
+        { expiresIn: '7d' }
+      );
+
+      reply.setCookie('refreshToken', newRefreshToken, {
+        httpOnly: true,
+        secure: app.config.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/api/v1/auth/refresh',
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+      });
 
       return { accessToken };
     } catch {

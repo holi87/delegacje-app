@@ -87,28 +87,34 @@ const FOREIGN_RATES: ForeignRateData[] = [
 const VALID_FROM = new Date('2023-01-01');
 
 export async function seedForeignRates(prisma: PrismaClient): Promise<void> {
-  const existingCount = await prisma.foreignDietRate.count();
-  if (existingCount > 0) {
-    console.log(`Foreign diet rates already seeded (${existingCount} records found), skipping`);
-    return;
-  }
+  let created = 0;
 
   for (const rate of FOREIGN_RATES) {
-    await prisma.foreignDietRate.create({
-      data: {
-        countryCode: rate.countryCode,
-        countryName: rate.countryName,
-        currency: rate.currency,
-        dailyDiet: rate.dailyDiet,
-        accommodationLimit: rate.accommodationLimit,
-        breakfastDeductionPct: 15,
-        lunchDeductionPct: 30,
-        dinnerDeductionPct: 30,
-        validFrom: VALID_FROM,
-        validTo: null,
-      },
+    const existing = await prisma.foreignDietRate.findFirst({
+      where: { countryCode: rate.countryCode, validTo: null },
     });
+    if (!existing) {
+      await prisma.foreignDietRate.create({
+        data: {
+          countryCode: rate.countryCode,
+          countryName: rate.countryName,
+          currency: rate.currency,
+          dailyDiet: rate.dailyDiet,
+          accommodationLimit: rate.accommodationLimit,
+          breakfastDeductionPct: 15,
+          lunchDeductionPct: 30,
+          dinnerDeductionPct: 30,
+          validFrom: VALID_FROM,
+          validTo: null,
+        },
+      });
+      created++;
+    }
   }
 
-  console.log(`Seeded ${FOREIGN_RATES.length} foreign diet rates`);
+  if (created > 0) {
+    console.log(`Seeded ${created} foreign diet rates`);
+  } else {
+    console.log('Foreign diet rates already seeded, skipping');
+  }
 }
