@@ -10,6 +10,10 @@ import {
   getMileageRates,
   createMileageRate,
   updateMileageRate,
+  getForeignRates,
+  createForeignRate,
+  updateForeignRate,
+  deleteForeignRate,
 } from '@/api/admin';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
@@ -46,8 +50,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Plus, Pencil } from 'lucide-react';
-import type { DomesticRate, MileageRate, VehicleType } from '../../../../shared/types';
+import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
+import type { DomesticRate, MileageRate, ForeignDietRate, VehicleType } from '../../../../shared/types';
 
 // --- Constants ---
 
@@ -99,6 +103,21 @@ const mileageRateSchema = z.object({
 
 type MileageRateFormData = z.infer<typeof mileageRateSchema>;
 
+const foreignRateSchema = z.object({
+  countryCode: z.string().min(2, 'Kod kraju jest wymagany (2-3 znaki)').max(3),
+  countryName: z.string().min(1, 'Nazwa kraju jest wymagana'),
+  currency: z.string().length(3, 'Waluta musi miec 3 znaki'),
+  dailyDiet: z.string().min(1, 'Stawka diety jest wymagana'),
+  accommodationLimit: z.string().min(1, 'Limit noclegu jest wymagany'),
+  breakfastDeductionPct: z.coerce.number().min(0).max(100),
+  lunchDeductionPct: z.coerce.number().min(0).max(100),
+  dinnerDeductionPct: z.coerce.number().min(0).max(100),
+  validFrom: z.string().min(1, 'Data obowiazywania od jest wymagana'),
+  validTo: z.string().optional(),
+});
+
+type ForeignRateFormData = z.infer<typeof foreignRateSchema>;
+
 // --- Component ---
 
 export default function AdminRatesPage() {
@@ -111,6 +130,10 @@ export default function AdminRatesPage() {
   // Mileage rates dialog state
   const [mileageDialogOpen, setMileageDialogOpen] = useState(false);
   const [editingMileageRate, setEditingMileageRate] = useState<MileageRate | null>(null);
+
+  // Foreign rates dialog state
+  const [foreignDialogOpen, setForeignDialogOpen] = useState(false);
+  const [editingForeignRate, setEditingForeignRate] = useState<ForeignDietRate | null>(null);
 
   // --- Queries ---
 
@@ -130,8 +153,17 @@ export default function AdminRatesPage() {
     queryFn: getMileageRates,
   });
 
+  const {
+    data: foreignRatesData,
+    isLoading: foreignLoading,
+  } = useQuery({
+    queryKey: ['admin', 'rates', 'foreign'],
+    queryFn: getForeignRates,
+  });
+
   const domesticRates: DomesticRate[] = domesticRatesData?.rates ?? domesticRatesData ?? [];
   const mileageRates: MileageRate[] = mileageRatesData?.rates ?? mileageRatesData ?? [];
+  const foreignRates: ForeignDietRate[] = foreignRatesData?.rates ?? foreignRatesData ?? [];
 
   // --- Domestic rate form ---
 
@@ -308,10 +340,121 @@ export default function AdminRatesPage() {
     }
   }
 
+  // --- Foreign rate form ---
+
+  const foreignForm = useForm<ForeignRateFormData>({
+    resolver: zodResolver(foreignRateSchema),
+    defaultValues: {
+      countryCode: '',
+      countryName: '',
+      currency: '',
+      dailyDiet: '',
+      accommodationLimit: '',
+      breakfastDeductionPct: 15,
+      lunchDeductionPct: 30,
+      dinnerDeductionPct: 30,
+      validFrom: '',
+      validTo: '',
+    },
+  });
+
+  const createForeignMutation = useMutation({
+    mutationFn: (data: ForeignRateFormData) =>
+      createForeignRate({
+        ...data,
+        validTo: data.validTo || null,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rates', 'foreign'] });
+      toast.success('Stawka diety zagranicznej zostala dodana');
+      closeForeignDialog();
+    },
+    onError: () => {
+      toast.error('Nie udalo sie dodac stawki');
+    },
+  });
+
+  const updateForeignMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: ForeignRateFormData }) =>
+      updateForeignRate(id, {
+        ...data,
+        validTo: data.validTo || null,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rates', 'foreign'] });
+      toast.success('Stawka diety zagranicznej zostala zaktualizowana');
+      closeForeignDialog();
+    },
+    onError: () => {
+      toast.error('Nie udalo sie zaktualizowac stawki');
+    },
+  });
+
+  const deleteForeignMutation = useMutation({
+    mutationFn: (id: string) => deleteForeignRate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rates', 'foreign'] });
+      toast.success('Stawka diety zagranicznej zostala usunieta');
+    },
+    onError: () => {
+      toast.error('Nie udalo sie usunac stawki');
+    },
+  });
+
+  function openNewForeignDialog() {
+    setEditingForeignRate(null);
+    foreignForm.reset({
+      countryCode: '',
+      countryName: '',
+      currency: '',
+      dailyDiet: '',
+      accommodationLimit: '',
+      breakfastDeductionPct: 15,
+      lunchDeductionPct: 30,
+      dinnerDeductionPct: 30,
+      validFrom: '',
+      validTo: '',
+    });
+    setForeignDialogOpen(true);
+  }
+
+  function openEditForeignDialog(rate: ForeignDietRate) {
+    setEditingForeignRate(rate);
+    foreignForm.reset({
+      countryCode: rate.countryCode,
+      countryName: rate.countryName,
+      currency: rate.currency,
+      dailyDiet: rate.dailyDiet,
+      accommodationLimit: rate.accommodationLimit,
+      breakfastDeductionPct: rate.breakfastDeductionPct,
+      lunchDeductionPct: rate.lunchDeductionPct,
+      dinnerDeductionPct: rate.dinnerDeductionPct,
+      validFrom: rate.validFrom.substring(0, 10),
+      validTo: rate.validTo ? rate.validTo.substring(0, 10) : '',
+    });
+    setForeignDialogOpen(true);
+  }
+
+  function closeForeignDialog() {
+    setForeignDialogOpen(false);
+    setEditingForeignRate(null);
+    foreignForm.reset();
+  }
+
+  function onForeignSubmit(data: ForeignRateFormData) {
+    if (editingForeignRate) {
+      updateForeignMutation.mutate({ id: editingForeignRate.id, data });
+    } else {
+      createForeignMutation.mutate(data);
+    }
+  }
+
   const isDomesticPending =
     createDomesticMutation.isPending || updateDomesticMutation.isPending;
   const isMileagePending =
     createMileageMutation.isPending || updateMileageMutation.isPending;
+  const isForeignPending =
+    createForeignMutation.isPending || updateForeignMutation.isPending;
 
   return (
     <div className="space-y-8">
@@ -444,6 +587,85 @@ export default function AdminRatesPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Foreign diet rates section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Stawki diet zagranicznych</CardTitle>
+              <CardDescription>
+                Stawki diet i limitow noclegow dla delegacji zagranicznych
+              </CardDescription>
+            </div>
+            <Button onClick={openNewForeignDialog}>
+              <Plus className="mr-2 h-4 w-4" />
+              Dodaj stawke
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {foreignLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : foreignRates.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Brak zdefiniowanych stawek diet zagranicznych.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Kraj</TableHead>
+                  <TableHead>Kod</TableHead>
+                  <TableHead>Waluta</TableHead>
+                  <TableHead>Dieta dzienna</TableHead>
+                  <TableHead>Limit noclegu</TableHead>
+                  <TableHead>Pomniejszenia (%)</TableHead>
+                  <TableHead>Obowiazuje od</TableHead>
+                  <TableHead className="w-[80px]">Akcje</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {foreignRates.map((rate: ForeignDietRate) => (
+                  <TableRow key={rate.id}>
+                    <TableCell className="font-medium">{rate.countryName}</TableCell>
+                    <TableCell>{rate.countryCode}</TableCell>
+                    <TableCell>{rate.currency}</TableCell>
+                    <TableCell>{rate.dailyDiet} {rate.currency}</TableCell>
+                    <TableCell>{rate.accommodationLimit} {rate.currency}</TableCell>
+                    <TableCell className="text-xs">
+                      <div>Sniad.: {rate.breakfastDeductionPct}%</div>
+                      <div>Obiad: {rate.lunchDeductionPct}%</div>
+                      <div>Kolacja: {rate.dinnerDeductionPct}%</div>
+                    </TableCell>
+                    <TableCell>{formatDate(rate.validFrom)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditForeignDialog(rate)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteForeignMutation.mutate(rate.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -735,6 +957,185 @@ export default function AdminRatesPage() {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 {editingMileageRate ? 'Zapisz zmiany' : 'Dodaj stawke'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Foreign rate dialog */}
+      <Dialog open={foreignDialogOpen} onOpenChange={setForeignDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingForeignRate
+                ? 'Edytuj stawke diety zagranicznej'
+                : 'Nowa stawka diety zagranicznej'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingForeignRate
+                ? 'Zmien wartosci stawki diety zagranicznej.'
+                : 'Wprowadz nowa stawke diety zagranicznej.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={foreignForm.handleSubmit(onForeignSubmit)}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fr-countryCode">Kod kraju</Label>
+                <Input
+                  id="fr-countryCode"
+                  placeholder="DE"
+                  maxLength={3}
+                  {...foreignForm.register('countryCode')}
+                />
+                {foreignForm.formState.errors.countryCode && (
+                  <p className="text-sm text-destructive">
+                    {foreignForm.formState.errors.countryCode.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fr-countryName">Nazwa kraju</Label>
+                <Input
+                  id="fr-countryName"
+                  placeholder="Niemcy"
+                  {...foreignForm.register('countryName')}
+                />
+                {foreignForm.formState.errors.countryName && (
+                  <p className="text-sm text-destructive">
+                    {foreignForm.formState.errors.countryName.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fr-currency">Waluta</Label>
+                <Input
+                  id="fr-currency"
+                  placeholder="EUR"
+                  maxLength={3}
+                  {...foreignForm.register('currency')}
+                />
+                {foreignForm.formState.errors.currency && (
+                  <p className="text-sm text-destructive">
+                    {foreignForm.formState.errors.currency.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fr-dailyDiet">Dieta dzienna</Label>
+                <Input
+                  id="fr-dailyDiet"
+                  type="number"
+                  step="0.01"
+                  placeholder="49.00"
+                  {...foreignForm.register('dailyDiet')}
+                />
+                {foreignForm.formState.errors.dailyDiet && (
+                  <p className="text-sm text-destructive">
+                    {foreignForm.formState.errors.dailyDiet.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fr-accommodationLimit">Limit noclegu</Label>
+                <Input
+                  id="fr-accommodationLimit"
+                  type="number"
+                  step="0.01"
+                  placeholder="150.00"
+                  {...foreignForm.register('accommodationLimit')}
+                />
+                {foreignForm.formState.errors.accommodationLimit && (
+                  <p className="text-sm text-destructive">
+                    {foreignForm.formState.errors.accommodationLimit.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fr-breakfastDeductionPct">Pomniejszenie sniadanie (%)</Label>
+                <Input
+                  id="fr-breakfastDeductionPct"
+                  type="number"
+                  min={0}
+                  max={100}
+                  {...foreignForm.register('breakfastDeductionPct')}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fr-lunchDeductionPct">Pomniejszenie obiad (%)</Label>
+                <Input
+                  id="fr-lunchDeductionPct"
+                  type="number"
+                  min={0}
+                  max={100}
+                  {...foreignForm.register('lunchDeductionPct')}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fr-dinnerDeductionPct">Pomniejszenie kolacja (%)</Label>
+                <Input
+                  id="fr-dinnerDeductionPct"
+                  type="number"
+                  min={0}
+                  max={100}
+                  {...foreignForm.register('dinnerDeductionPct')}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fr-validFrom">Obowiazuje od</Label>
+                <Input
+                  id="fr-validFrom"
+                  type="date"
+                  {...foreignForm.register('validFrom')}
+                />
+                {foreignForm.formState.errors.validFrom && (
+                  <p className="text-sm text-destructive">
+                    {foreignForm.formState.errors.validFrom.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fr-validTo">Obowiazuje do (opcjonalnie)</Label>
+                <Input
+                  id="fr-validTo"
+                  type="date"
+                  {...foreignForm.register('validTo')}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeForeignDialog}
+              >
+                Anuluj
+              </Button>
+              <Button type="submit" disabled={isForeignPending}>
+                {isForeignPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {editingForeignRate ? 'Zapisz zmiany' : 'Dodaj stawke'}
               </Button>
             </DialogFooter>
           </form>

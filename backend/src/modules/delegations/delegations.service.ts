@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma, DelegationStatus } from '@prisma/client';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../utils/errors.js';
 import { calculateDelegation, CalculationInput, CalculationResult } from './calculation.service.js';
+import { calculateForeignDelegation, ForeignDelegationInput, ForeignCalculationResult, findForeignRate } from './foreign-calculation.service.js';
 import type { CreateDelegationInput, UpdateDelegationInput } from './delegations.schema.js';
 
 // =====================
@@ -62,6 +63,13 @@ function serializeDelegation(delegation: any) {
     totalAdditional: decimalToString(delegation.totalAdditional),
     grandTotal: decimalToString(delegation.grandTotal),
     amountDue: decimalToString(delegation.amountDue),
+    foreignCountry: delegation.foreignCountry,
+    foreignCurrency: delegation.foreignCurrency,
+    foreignRateId: delegation.foreignRateId,
+    borderCrossingOut: delegation.borderCrossingOut?.toISOString() ?? null,
+    borderCrossingIn: delegation.borderCrossingIn?.toISOString() ?? null,
+    totalDomesticDiet: decimalToString(delegation.totalDomesticDiet),
+    totalForeignDiet: decimalToString(delegation.totalForeignDiet),
     settledAt: delegation.settledAt?.toISOString() ?? null,
     settledBy: delegation.settledBy,
     createdAt: delegation.createdAt.toISOString(),
@@ -86,6 +94,8 @@ function serializeDelegation(delegation: any) {
       dietBase: decimalToString(d.dietBase),
       dietDeductions: decimalToString(d.dietDeductions),
       dietFinal: decimalToString(d.dietFinal),
+      isForeign: d.isForeign,
+      dietRate: decimalToString(d.dietRate),
     })),
     additionalCosts: delegation.additionalCosts?.map((c: any) => ({
       id: c.id,
@@ -204,6 +214,9 @@ export async function createDelegation(
       transportNotes: input.transportNotes ?? null,
       accommodationType: input.accommodationType as any,
       advanceAmount: new Prisma.Decimal(input.advanceAmount),
+      foreignCountry: input.foreignCountry ?? null,
+      borderCrossingOut: input.borderCrossingOut ? new Date(input.borderCrossingOut) : null,
+      borderCrossingIn: input.borderCrossingIn ? new Date(input.borderCrossingIn) : null,
       days: {
         create: input.days.map((day) => ({
           dayNumber: day.dayNumber,
@@ -216,6 +229,7 @@ export async function createDelegation(
           accommodationCost: day.accommodationCost != null
             ? new Prisma.Decimal(day.accommodationCost)
             : null,
+          isForeign: day.isForeign ?? false,
         })),
       },
       ...(input.mileageDetails
@@ -301,6 +315,10 @@ export async function updateDelegation(
   if (input.transportNotes !== undefined) updateData.transportNotes = input.transportNotes ?? null;
   if (input.accommodationType !== undefined) updateData.accommodationType = input.accommodationType as any;
   if (input.advanceAmount !== undefined) updateData.advanceAmount = new Prisma.Decimal(input.advanceAmount);
+  if (input.type !== undefined) updateData.type = input.type as any;
+  if (input.foreignCountry !== undefined) updateData.foreignCountry = input.foreignCountry ?? null;
+  if (input.borderCrossingOut !== undefined) updateData.borderCrossingOut = input.borderCrossingOut ? new Date(input.borderCrossingOut) : null;
+  if (input.borderCrossingIn !== undefined) updateData.borderCrossingIn = input.borderCrossingIn ? new Date(input.borderCrossingIn) : null;
 
   // Use a transaction to atomically update delegation + related records
   const updated = await prisma.$transaction(async (tx) => {
@@ -320,6 +338,7 @@ export async function updateDelegation(
           accommodationCost: day.accommodationCost != null
             ? new Prisma.Decimal(day.accommodationCost)
             : null,
+          isForeign: day.isForeign ?? false,
         })),
       });
     }
@@ -446,6 +465,85 @@ export async function submitDelegation(
   }
 
   // Run calculation before submitting to freeze the computed amounts
+  if (existing.type === 'FOREIGN') {
+    // Foreign delegation uses the two-segment calculation
+    const foreignInput = buildForeignCalculationInput(existing);
+    const foreignResult = await calculateForeignDelegation(prisma, foreignInput);
+
+    // Save calculated totals and per-day values
+    const updated = await prisma.$transaction(async (tx) => {
+      // Update domestic segment days
+      for (const dayResult of foreignResult.diet.domesticDays) {
+        const dayRecord = existing.days.find((d: any) => d.dayNumber === dayResult.dayNumber);
+        if (dayRecord) {
+          await tx.delegationDay.update({
+            where: { id: dayRecord.id },
+            data: {
+              hoursInDay: new Prisma.Decimal(dayResult.hours),
+              dietBase: new Prisma.Decimal(dayResult.baseAmount),
+              dietDeductions: new Prisma.Decimal(dayResult.deductions.total),
+              dietFinal: new Prisma.Decimal(dayResult.finalAmount),
+              isForeign: false,
+            },
+          });
+        }
+      }
+
+      // Update foreign segment days
+      for (const dayResult of foreignResult.diet.foreignDays) {
+        const dayRecord = existing.days.find((d: any) => d.dayNumber === dayResult.dayNumber);
+        if (dayRecord) {
+          await tx.delegationDay.update({
+            where: { id: dayRecord.id },
+            data: {
+              hoursInDay: new Prisma.Decimal(dayResult.hours),
+              dietBase: new Prisma.Decimal(dayResult.baseAmount),
+              dietDeductions: new Prisma.Decimal(dayResult.deductions.total),
+              dietFinal: new Prisma.Decimal(dayResult.finalAmount),
+              isForeign: true,
+            },
+          });
+        }
+      }
+
+      // Update mileage details with rate from DB
+      if (foreignResult.transport.mileage && existing.mileageDetails) {
+        await tx.mileageDetails.update({
+          where: { delegationId },
+          data: {
+            ratePerKm: new Prisma.Decimal(foreignResult.transport.mileage.ratePerKm),
+            totalAmount: new Prisma.Decimal(foreignResult.transport.mileage.total),
+          },
+        });
+      }
+
+      // Look up foreign rate ID to freeze it
+      const foreignRate = await findForeignRate(prisma, foreignInput.foreignCountry, new Date(foreignInput.departureAt));
+
+      // Update delegation totals and status
+      return tx.delegation.update({
+        where: { id: delegationId },
+        data: {
+          status: 'SUBMITTED',
+          foreignRateId: foreignRate.id,
+          foreignCurrency: foreignRate.currency,
+          totalDiet: new Prisma.Decimal(foreignResult.summary.dietTotal),
+          totalDomesticDiet: new Prisma.Decimal(foreignResult.summary.domesticDietTotal),
+          totalForeignDiet: new Prisma.Decimal(foreignResult.summary.foreignDietTotal),
+          totalAccommodation: new Prisma.Decimal(foreignResult.summary.accommodationTotal),
+          totalTransport: new Prisma.Decimal(foreignResult.summary.transportTotal),
+          totalAdditional: new Prisma.Decimal(foreignResult.summary.additionalTotal),
+          grandTotal: new Prisma.Decimal(foreignResult.summary.grandTotal),
+          amountDue: new Prisma.Decimal(foreignResult.summary.amountDue),
+        },
+        include: fullDelegationInclude,
+      });
+    });
+
+    return serializeDelegation(updated);
+  }
+
+  // Domestic delegation - original logic
   const calcInput = buildCalculationInput(existing);
   const calcResult = await calculateDelegation(prisma, calcInput);
 
@@ -599,6 +697,11 @@ export async function calculateDelegationForPreview(
     throw new ForbiddenError('Brak uprawnień do tej delegacji');
   }
 
+  if (delegation.type === 'FOREIGN') {
+    const foreignInput = buildForeignCalculationInput(delegation);
+    return calculateForeignDelegation(prisma, foreignInput) as any;
+  }
+
   const calcInput = buildCalculationInput(delegation);
   return calculateDelegation(prisma, calcInput);
 }
@@ -617,6 +720,51 @@ function buildCalculationInput(delegation: any): CalculationInput {
     days: delegation.days.map((d: any) => ({
       dayNumber: d.dayNumber,
       date: d.date.toISOString().split('T')[0],
+      breakfastProvided: d.breakfastProvided,
+      lunchProvided: d.lunchProvided,
+      dinnerProvided: d.dinnerProvided,
+      accommodationType: d.accommodationType,
+      accommodationCost: d.accommodationCost ? Number(d.accommodationCost.toString()) : null,
+    })),
+    mileageDetails: delegation.mileageDetails
+      ? {
+          vehicleType: delegation.mileageDetails.vehicleType,
+          vehiclePlate: delegation.mileageDetails.vehiclePlate,
+          distanceKm: Number(delegation.mileageDetails.distanceKm.toString()),
+        }
+      : null,
+    transportReceipts: (delegation.transportReceipts ?? []).map((r: any) => ({
+      description: r.description,
+      amount: Number(r.amount.toString()),
+      receiptNumber: r.receiptNumber,
+    })),
+    additionalCosts: (delegation.additionalCosts ?? []).map((c: any) => ({
+      description: c.description,
+      category: c.category,
+      amount: Number(c.amount.toString()),
+      receiptNumber: c.receiptNumber,
+    })),
+  };
+}
+
+// =====================
+// Helper: Build ForeignDelegationInput from a Prisma delegation record
+// =====================
+
+function buildForeignCalculationInput(delegation: any): ForeignDelegationInput {
+  return {
+    departureAt: delegation.departureAt.toISOString(),
+    returnAt: delegation.returnAt.toISOString(),
+    borderCrossingOut: delegation.borderCrossingOut?.toISOString() ?? delegation.departureAt.toISOString(),
+    borderCrossingIn: delegation.borderCrossingIn?.toISOString() ?? delegation.returnAt.toISOString(),
+    foreignCountry: delegation.foreignCountry ?? '',
+    transportType: delegation.transportType,
+    vehicleType: delegation.vehicleType,
+    advanceAmount: Number(delegation.advanceAmount?.toString() ?? '0'),
+    days: delegation.days.map((d: any) => ({
+      dayNumber: d.dayNumber,
+      date: d.date.toISOString().split('T')[0],
+      isForeign: d.isForeign ?? false,
       breakfastProvided: d.breakfastProvided,
       lunchProvided: d.lunchProvided,
       dinnerProvided: d.dinnerProvided,

@@ -14,11 +14,14 @@ import {
 
 function buildApiPayload(data: DelegationFormValues) {
   return {
-    type: 'DOMESTIC' as const,
+    type: data.type ?? 'DOMESTIC',
     purpose: data.purpose,
     destination: data.destination,
     departureAt: new Date(data.departureAt).toISOString(),
     returnAt: new Date(data.returnAt).toISOString(),
+    foreignCountry: data.foreignCountry ?? null,
+    borderCrossingOut: data.borderCrossingOut ? new Date(data.borderCrossingOut).toISOString() : null,
+    borderCrossingIn: data.borderCrossingIn ? new Date(data.borderCrossingIn).toISOString() : null,
     transportType: data.transportType,
     vehicleType: data.mileageDetails?.vehicleType ?? null,
     accommodationType: data.accommodationType,
@@ -31,6 +34,7 @@ function buildApiPayload(data: DelegationFormValues) {
       dinnerProvided: d.dinnerProvided,
       accommodationType: d.accommodationType,
       accommodationCost: d.accommodationCost || null,
+      isForeign: d.isForeign ?? false,
     })),
     mileageDetails: data.mileageDetails
       ? {
@@ -135,7 +139,7 @@ export default function NewDelegationPage() {
       <div>
         <h1 className="text-2xl font-bold">Nowa delegacja</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Wypelnij formularz krok po kroku, aby utworzyc nowa delegacje krajowa.
+          Wypelnij formularz krok po kroku, aby utworzyc nowa delegacje.
         </p>
       </div>
 

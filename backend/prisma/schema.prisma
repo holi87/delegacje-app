@@ -110,8 +110,13 @@ model Delegation {
   grandTotal         Decimal? @db.Decimal(10, 2) @map("grand_total")
   amountDue          Decimal? @db.Decimal(10, 2) @map("amount_due")
 
-  foreignCountry  String? @map("foreign_country")
-  foreignCurrency String? @map("foreign_currency")
+  foreignCountry      String?   @map("foreign_country")
+  foreignCurrency     String?   @map("foreign_currency")
+  foreignRateId       String?   @map("foreign_rate_id")
+  borderCrossingOut   DateTime? @map("border_crossing_out")  // wyjazd z PL
+  borderCrossingIn    DateTime? @map("border_crossing_in")   // powrót do PL
+  totalDomesticDiet   Decimal?  @db.Decimal(10, 2) @map("total_domestic_diet")   // dieta za odcinek krajowy
+  totalForeignDiet    Decimal?  @db.Decimal(10, 2) @map("total_foreign_diet")    // dieta za odcinek zagraniczny
 
   settledAt DateTime? @map("settled_at")
   settledBy String?   @map("settled_by")
@@ -146,6 +151,10 @@ model DelegationDay {
   dietBase       Decimal? @db.Decimal(10, 2) @map("diet_base")
   dietDeductions Decimal? @db.Decimal(10, 2) @map("diet_deductions")
   dietFinal      Decimal? @db.Decimal(10, 2) @map("diet_final")
+
+  // Foreign delegation fields
+  isForeign      Boolean  @default(false) @map("is_foreign")  // true = foreign segment day
+  dietRate       Decimal? @db.Decimal(10, 2) @map("diet_rate") // frozen rate used for this day
 
   delegation Delegation @relation(fields: [delegationId], references: [id], onDelete: Cascade)
 

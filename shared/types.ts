@@ -61,6 +61,20 @@ export interface MileageRate {
   validTo: string | null;
 }
 
+export interface ForeignDietRate {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  currency: string;
+  dailyDiet: string;
+  accommodationLimit: string;
+  breakfastDeductionPct: number;
+  lunchDeductionPct: number;
+  dinnerDeductionPct: number;
+  validFrom: string;
+  validTo: string | null;
+}
+
 export interface DelegationDayInput {
   dayNumber: number;
   date: string;
@@ -69,6 +83,7 @@ export interface DelegationDayInput {
   dinnerProvided: boolean;
   accommodationType: AccommodationType;
   accommodationCost?: string | null;
+  isForeign?: boolean;
 }
 
 export interface MileageDetailsInput {
@@ -105,6 +120,9 @@ export interface DelegationInput {
   mileageDetails?: MileageDetailsInput | null;
   transportReceipts: TransportReceiptInput[];
   additionalCosts: AdditionalCostInput[];
+  foreignCountry?: string | null;
+  borderCrossingOut?: string | null;
+  borderCrossingIn?: string | null;
 }
 
 export interface CalculationDayResult {
@@ -151,6 +169,51 @@ export interface CalculationResult {
     total: string;
   };
   summary: {
+    dietTotal: string;
+    accommodationTotal: string;
+    transportTotal: string;
+    additionalTotal: string;
+    grandTotal: string;
+    advanceAmount: string;
+    amountDue: string;
+  };
+}
+
+export interface ForeignCalculationResult {
+  duration: {
+    totalHours: number;
+    domesticHours: number;
+    foreignHours: number;
+  };
+  diet: {
+    domesticDays: CalculationDayResult[];
+    foreignDays: CalculationDayResult[];
+    domesticTotal: string;
+    foreignTotal: string;
+    total: string;
+  };
+  accommodation: {
+    nights: Array<{ type: AccommodationType; amount: string; isForeign?: boolean; overLimit?: boolean }>;
+    total: string;
+  };
+  transport: {
+    type: TransportType;
+    mileage?: {
+      distanceKm: number;
+      ratePerKm: string;
+      total: string;
+    };
+    receipts: TransportReceiptInput[];
+    localTransportLumpSum: string;
+    total: string;
+  };
+  additionalCosts: {
+    items: Array<{ description: string; amount: string }>;
+    total: string;
+  };
+  summary: {
+    domesticDietTotal: string;
+    foreignDietTotal: string;
     dietTotal: string;
     accommodationTotal: string;
     transportTotal: string;

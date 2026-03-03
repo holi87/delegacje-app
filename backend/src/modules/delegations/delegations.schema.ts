@@ -24,6 +24,7 @@ const delegationDaySchema = z.object({
     .union([z.number().min(0, 'Kwota noclegu nie może być ujemna'), z.null()])
     .optional()
     .default(null),
+  isForeign: z.boolean().default(false),
 });
 
 const mileageDetailsSchema = z.object({
@@ -59,6 +60,9 @@ export const createDelegationSchema = z
     transportType: transportTypeEnum,
     vehicleType: vehicleTypeEnum.nullable().optional(),
     transportNotes: z.string().nullable().optional(),
+    foreignCountry: z.string().nullable().optional(),
+    borderCrossingOut: z.string().datetime({ message: 'Nieprawidłowy format daty przekroczenia granicy' }).nullable().optional(),
+    borderCrossingIn: z.string().datetime({ message: 'Nieprawidłowy format daty powrotu przez granicę' }).nullable().optional(),
     accommodationType: accommodationTypeEnum.default('NONE'),
     advanceAmount: z.number().min(0, 'Kwota zaliczki nie może być ujemna').default(0),
     days: z.array(delegationDaySchema).min(1, 'Wymagany co najmniej jeden dzień delegacji'),
@@ -87,6 +91,18 @@ export const createDelegationSchema = z
       message: 'Dane kilometrówki są wymagane dla pojazdu prywatnego / transportu mieszanego',
       path: ['mileageDetails'],
     }
+  )
+  .refine(
+    (data) => {
+      if (data.type === 'FOREIGN') {
+        return !!data.foreignCountry && !!data.borderCrossingOut && !!data.borderCrossingIn;
+      }
+      return true;
+    },
+    {
+      message: 'Dla delegacji zagranicznej wymagane są: kraj, czas przekroczenia granicy (wyjazd i powrót)',
+      path: ['foreignCountry'],
+    }
   );
 
 export type CreateDelegationInput = z.infer<typeof createDelegationSchema>;
@@ -97,6 +113,7 @@ export type CreateDelegationInput = z.infer<typeof createDelegationSchema>;
 
 export const updateDelegationSchema = z
   .object({
+    type: delegationTypeEnum.optional(),
     purpose: z.string().min(1, 'Cel delegacji jest wymagany').optional(),
     destination: z.string().min(1, 'Miejsce delegacji jest wymagane').optional(),
     departureAt: z.string().datetime({ message: 'Nieprawidłowy format daty wyjazdu (ISO 8601)' }).optional(),
@@ -104,6 +121,9 @@ export const updateDelegationSchema = z
     transportType: transportTypeEnum.optional(),
     vehicleType: vehicleTypeEnum.nullable().optional(),
     transportNotes: z.string().nullable().optional(),
+    foreignCountry: z.string().nullable().optional(),
+    borderCrossingOut: z.string().datetime().nullable().optional(),
+    borderCrossingIn: z.string().datetime().nullable().optional(),
     accommodationType: accommodationTypeEnum.optional(),
     advanceAmount: z.number().min(0, 'Kwota zaliczki nie może być ujemna').optional(),
     days: z.array(delegationDaySchema).min(1, 'Wymagany co najmniej jeden dzień delegacji').optional(),

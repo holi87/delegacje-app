@@ -1,10 +1,20 @@
 import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Clock } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Clock, Globe } from 'lucide-react';
+import { getForeignRates } from '@/api/admin';
 import type { DelegationFormValues } from './DelegationWizard';
+import type { ForeignDietRate } from '../../../../shared/types';
 
 /**
  * Calculate delegation duration display text.
@@ -55,16 +65,40 @@ export function StepBasicInfo() {
   const {
     register,
     watch,
+    setValue,
     formState: { errors },
   } = useFormContext<DelegationFormValues>();
 
   const departureAt = watch('departureAt');
   const returnAt = watch('returnAt');
+  const delegationType = watch('type');
 
   const durationText = useMemo(
     () => formatDuration(departureAt, returnAt),
     [departureAt, returnAt]
   );
+
+  // Fetch foreign rates for the country selector
+  const { data: foreignRatesData } = useQuery({
+    queryKey: ['admin', 'rates', 'foreign'],
+    queryFn: getForeignRates,
+    enabled: delegationType === 'FOREIGN',
+  });
+
+  const foreignRates: ForeignDietRate[] = foreignRatesData?.rates ?? foreignRatesData ?? [];
+
+  // Get unique countries (latest rate per country)
+  const countries = useMemo(() => {
+    const countryMap = new Map<string, ForeignDietRate>();
+    for (const rate of foreignRates) {
+      if (!countryMap.has(rate.countryCode)) {
+        countryMap.set(rate.countryCode, rate);
+      }
+    }
+    return Array.from(countryMap.values()).sort((a, b) =>
+      a.countryName.localeCompare(b.countryName, 'pl')
+    );
+  }, [foreignRates]);
 
   return (
     <div className="space-y-6">
@@ -73,6 +107,23 @@ export function StepBasicInfo() {
         <p className="text-sm text-muted-foreground">
           Podaj cel, miejsce i daty delegacji.
         </p>
+      </div>
+
+      {/* Delegation type */}
+      <div className="space-y-2">
+        <Label>Typ delegacji *</Label>
+        <Select
+          value={delegationType ?? 'DOMESTIC'}
+          onValueChange={(value) => setValue('type', value as any)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Wybierz typ" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="DOMESTIC">Krajowa</SelectItem>
+            <SelectItem value="FOREIGN">Zagraniczna</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Purpose */}
@@ -93,7 +144,7 @@ export function StepBasicInfo() {
         <Label htmlFor="destination">Miejsce delegacji *</Label>
         <Input
           id="destination"
-          placeholder="np. Krakow, Warszawa..."
+          placeholder={delegationType === 'FOREIGN' ? 'np. Berlin, Monachium...' : 'np. Krakow, Warszawa...'}
           {...register('destination')}
         />
         {errors.destination && (
@@ -102,6 +153,36 @@ export function StepBasicInfo() {
           </p>
         )}
       </div>
+
+      {/* Foreign country selector */}
+      {delegationType === 'FOREIGN' && (
+        <div className="space-y-2">
+          <Label>Kraj docelowy *</Label>
+          <Select
+            value={watch('foreignCountry') ?? ''}
+            onValueChange={(value) => setValue('foreignCountry', value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Wybierz kraj" />
+            </SelectTrigger>
+            <SelectContent>
+              {countries.map((rate) => (
+                <SelectItem key={rate.countryCode} value={rate.countryCode}>
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-3 w-3" />
+                    {rate.countryName} ({rate.currency})
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.foreignCountry && (
+            <p className="text-sm text-destructive">
+              {(errors.foreignCountry as any).message}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Departure / Return dates */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -133,6 +214,43 @@ export function StepBasicInfo() {
           )}
         </div>
       </div>
+
+      {/* Border crossing times (foreign only) */}
+      {delegationType === 'FOREIGN' && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="borderCrossingOut">
+              Przekroczenie granicy (wyjazd z PL) *
+            </Label>
+            <Input
+              id="borderCrossingOut"
+              type="datetime-local"
+              {...register('borderCrossingOut')}
+            />
+            {errors.borderCrossingOut && (
+              <p className="text-sm text-destructive">
+                {(errors.borderCrossingOut as any).message}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="borderCrossingIn">
+              Przekroczenie granicy (powrot do PL) *
+            </Label>
+            <Input
+              id="borderCrossingIn"
+              type="datetime-local"
+              {...register('borderCrossingIn')}
+            />
+            {errors.borderCrossingIn && (
+              <p className="text-sm text-destructive">
+                {(errors.borderCrossingIn as any).message}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Duration display */}
       {durationText && (

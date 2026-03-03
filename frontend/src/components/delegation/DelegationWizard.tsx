@@ -45,6 +45,7 @@ const delegationDaySchema = z.object({
   dinnerProvided: z.boolean(),
   accommodationType: z.enum(['RECEIPT', 'LUMP_SUM', 'FREE', 'NONE']),
   accommodationCost: z.string().nullable().optional(),
+  isForeign: z.boolean().default(false),
 });
 
 const mileageDetailsSchema = z.object({
@@ -59,6 +60,10 @@ export const delegationFormSchema = z
     destination: z.string().min(1, 'Miejsce delegacji jest wymagane'),
     departureAt: z.string().min(1, 'Data wyjazdu jest wymagana'),
     returnAt: z.string().min(1, 'Data powrotu jest wymagana'),
+    type: z.enum(['DOMESTIC', 'FOREIGN']).default('DOMESTIC'),
+    foreignCountry: z.string().nullable().optional(),
+    borderCrossingOut: z.string().nullable().optional(),
+    borderCrossingIn: z.string().nullable().optional(),
     transportType: z.enum([
       'COMPANY_VEHICLE',
       'PUBLIC_TRANSPORT',
@@ -96,6 +101,18 @@ export const delegationFormSchema = z
       message: 'Dane pojazdu sa wymagane dla tego typu transportu',
       path: ['mileageDetails'],
     }
+  )
+  .refine(
+    (data) => {
+      if (data.type === 'FOREIGN') {
+        return !!data.foreignCountry && !!data.borderCrossingOut && !!data.borderCrossingIn;
+      }
+      return true;
+    },
+    {
+      message: 'Dla delegacji zagranicznej wymagane sa: kraj, czas przekroczenia granicy',
+      path: ['foreignCountry'],
+    }
   );
 
 export type DelegationFormValues = z.infer<typeof delegationFormSchema>;
@@ -114,7 +131,7 @@ const STEPS = [
 
 // Fields to validate per step (partial validation on Next)
 const STEP_FIELDS: Record<number, (keyof DelegationFormValues)[]> = {
-  1: ['purpose', 'destination', 'departureAt', 'returnAt'],
+  1: ['purpose', 'destination', 'departureAt', 'returnAt', 'type'],
   2: ['transportType', 'mileageDetails', 'transportReceipts'],
   3: ['accommodationType', 'days'],
   4: ['days'],
@@ -156,6 +173,10 @@ export function DelegationWizard({
       destination: '',
       departureAt: '',
       returnAt: '',
+      type: 'DOMESTIC' as const,
+      foreignCountry: null,
+      borderCrossingOut: null,
+      borderCrossingIn: null,
       transportType: 'COMPANY_VEHICLE',
       accommodationType: 'NONE',
       advanceAmount: '0',

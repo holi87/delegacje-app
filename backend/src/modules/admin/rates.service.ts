@@ -192,3 +192,128 @@ export async function updateMileageRate(
     createdAt: rate.createdAt.toISOString(),
   };
 }
+
+// =====================
+// Foreign Diet Rates
+// =====================
+
+export async function listForeignRates(prisma: PrismaClient) {
+  const rates = await prisma.foreignDietRate.findMany({
+    orderBy: [{ countryName: 'asc' }, { validFrom: 'desc' }],
+  });
+
+  return rates.map((r) => ({
+    id: r.id,
+    countryCode: r.countryCode,
+    countryName: r.countryName,
+    currency: r.currency,
+    dailyDiet: r.dailyDiet.toString(),
+    accommodationLimit: r.accommodationLimit.toString(),
+    breakfastDeductionPct: r.breakfastDeductionPct,
+    lunchDeductionPct: r.lunchDeductionPct,
+    dinnerDeductionPct: r.dinnerDeductionPct,
+    validFrom: r.validFrom.toISOString(),
+    validTo: r.validTo?.toISOString() ?? null,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
+
+export async function createForeignRate(
+  prisma: PrismaClient,
+  data: {
+    countryCode: string;
+    countryName: string;
+    currency: string;
+    dailyDiet: string;
+    accommodationLimit: string;
+    breakfastDeductionPct: number;
+    lunchDeductionPct: number;
+    dinnerDeductionPct: number;
+    validFrom: string;
+    validTo?: string | null;
+  }
+) {
+  const rate = await prisma.foreignDietRate.create({
+    data: {
+      countryCode: data.countryCode.toUpperCase(),
+      countryName: data.countryName,
+      currency: data.currency.toUpperCase(),
+      dailyDiet: parseFloat(data.dailyDiet),
+      accommodationLimit: parseFloat(data.accommodationLimit),
+      breakfastDeductionPct: data.breakfastDeductionPct,
+      lunchDeductionPct: data.lunchDeductionPct,
+      dinnerDeductionPct: data.dinnerDeductionPct,
+      validFrom: new Date(data.validFrom),
+      validTo: data.validTo ? new Date(data.validTo) : null,
+    },
+  });
+
+  return {
+    id: rate.id,
+    countryCode: rate.countryCode,
+    countryName: rate.countryName,
+    currency: rate.currency,
+    dailyDiet: rate.dailyDiet.toString(),
+    accommodationLimit: rate.accommodationLimit.toString(),
+    breakfastDeductionPct: rate.breakfastDeductionPct,
+    lunchDeductionPct: rate.lunchDeductionPct,
+    dinnerDeductionPct: rate.dinnerDeductionPct,
+    validFrom: rate.validFrom.toISOString(),
+    validTo: rate.validTo?.toISOString() ?? null,
+    createdAt: rate.createdAt.toISOString(),
+  };
+}
+
+export async function updateForeignRate(
+  prisma: PrismaClient,
+  id: string,
+  data: {
+    countryCode?: string;
+    countryName?: string;
+    currency?: string;
+    dailyDiet?: string;
+    accommodationLimit?: string;
+    breakfastDeductionPct?: number;
+    lunchDeductionPct?: number;
+    dinnerDeductionPct?: number;
+    validFrom?: string;
+    validTo?: string | null;
+  }
+) {
+  const updateData: Record<string, unknown> = {};
+
+  if (data.countryCode !== undefined) updateData.countryCode = data.countryCode.toUpperCase();
+  if (data.countryName !== undefined) updateData.countryName = data.countryName;
+  if (data.currency !== undefined) updateData.currency = data.currency.toUpperCase();
+  if (data.dailyDiet !== undefined) updateData.dailyDiet = parseFloat(data.dailyDiet);
+  if (data.accommodationLimit !== undefined) updateData.accommodationLimit = parseFloat(data.accommodationLimit);
+  if (data.breakfastDeductionPct !== undefined) updateData.breakfastDeductionPct = data.breakfastDeductionPct;
+  if (data.lunchDeductionPct !== undefined) updateData.lunchDeductionPct = data.lunchDeductionPct;
+  if (data.dinnerDeductionPct !== undefined) updateData.dinnerDeductionPct = data.dinnerDeductionPct;
+  if (data.validFrom !== undefined) updateData.validFrom = new Date(data.validFrom);
+  if (data.validTo !== undefined) updateData.validTo = data.validTo ? new Date(data.validTo) : null;
+
+  const rate = await prisma.foreignDietRate.update({
+    where: { id },
+    data: updateData,
+  });
+
+  return {
+    id: rate.id,
+    countryCode: rate.countryCode,
+    countryName: rate.countryName,
+    currency: rate.currency,
+    dailyDiet: rate.dailyDiet.toString(),
+    accommodationLimit: rate.accommodationLimit.toString(),
+    breakfastDeductionPct: rate.breakfastDeductionPct,
+    lunchDeductionPct: rate.lunchDeductionPct,
+    dinnerDeductionPct: rate.dinnerDeductionPct,
+    validFrom: rate.validFrom.toISOString(),
+    validTo: rate.validTo?.toISOString() ?? null,
+    createdAt: rate.createdAt.toISOString(),
+  };
+}
+
+export async function deleteForeignRate(prisma: PrismaClient, id: string) {
+  await prisma.foreignDietRate.delete({ where: { id } });
+}

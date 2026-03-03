@@ -94,6 +94,7 @@ export function StepMeals() {
   const departureAt = watch('departureAt');
   const returnAt = watch('returnAt');
   const days = watch('days');
+  const delegationType = watch('type');
 
   const delegationDays = useMemo(
     () => calculateDelegationDays(departureAt, returnAt),
@@ -117,6 +118,7 @@ export function StepMeals() {
         dinnerProvided: existing?.dinnerProvided ?? false,
         accommodationType: existing?.accommodationType ?? 'NONE' as const,
         accommodationCost: existing?.accommodationCost ?? null,
+        isForeign: existing?.isForeign ?? false,
       };
     });
 
@@ -183,6 +185,9 @@ export function StepMeals() {
               <TableHead className="w-28 text-center">Sniadanie</TableHead>
               <TableHead className="w-28 text-center">Obiad</TableHead>
               <TableHead className="w-28 text-center">Kolacja</TableHead>
+              {delegationType === 'FOREIGN' && (
+                <TableHead className="w-32 text-center">Zagraniczny</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -228,6 +233,23 @@ export function StepMeals() {
                     </Label>
                   </div>
                 </TableCell>
+                {delegationType === 'FOREIGN' && (
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Checkbox
+                        checked={!!days[idx]?.isForeign}
+                        onCheckedChange={(checked) => {
+                          const updated = [...days];
+                          updated[idx] = { ...updated[idx], isForeign: !!checked };
+                          setValue('days', updated);
+                        }}
+                      />
+                      <Label className="text-xs font-normal sm:hidden">
+                        Zagr.
+                      </Label>
+                    </div>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

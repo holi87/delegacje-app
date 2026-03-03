@@ -26,6 +26,8 @@ interface DelegationDayData {
   dietBase: Decimal | null;
   dietDeductions: Decimal | null;
   dietFinal: Decimal | null;
+  isForeign: boolean;
+  dietRate: Decimal | null;
 }
 
 interface MileageData {
@@ -70,6 +72,13 @@ interface DelegationData {
   totalAdditional: Decimal | null;
   grandTotal: Decimal | null;
   amountDue: Decimal | null;
+  type: string;
+  foreignCountry: string | null;
+  foreignCurrency: string | null;
+  borderCrossingOut: Date | null;
+  borderCrossingIn: Date | null;
+  totalDomesticDiet: Decimal | null;
+  totalForeignDiet: Decimal | null;
   createdAt: Date;
   user: {
     profile: UserProfileData | null;
@@ -340,7 +349,10 @@ function renderHeader(
 
   // Title
   doc.font(FONT_BOLD).fontSize(FONT_SIZE_TITLE).fillColor(COLOR_BLACK);
-  doc.text('ROZLICZENIE KOSZTOW PODROZY SLUZBOWEJ', MARGIN, y, {
+  const titleText = delegation.type === 'FOREIGN'
+    ? 'ROZLICZENIE KOSZTOW PODROZY SLUZBOWEJ (ZAGRANICZNEJ)'
+    : 'ROZLICZENIE KOSZTOW PODROZY SLUZBOWEJ';
+  doc.text(titleText, MARGIN, y, {
     width: CONTENT_WIDTH,
     align: 'center',
   });
@@ -424,6 +436,22 @@ function renderBasicInfo(
     rows.push(['Pojazd:', `${vehicleTypeLabel(delegation.vehicleType)}${plate ? ', nr rej. ' + plate : ''}`]);
   }
 
+  // Foreign delegation info
+  if (delegation.type === 'FOREIGN') {
+    if (delegation.foreignCountry) {
+      rows.push(['Kraj docelowy:', delegation.foreignCountry]);
+    }
+    if (delegation.foreignCurrency) {
+      rows.push(['Waluta:', delegation.foreignCurrency]);
+    }
+    if (delegation.borderCrossingOut) {
+      rows.push(['Przekroczenie granicy (wyjazd):', formatDateTime(delegation.borderCrossingOut)]);
+    }
+    if (delegation.borderCrossingIn) {
+      rows.push(['Przekroczenie granicy (powrot):', formatDateTime(delegation.borderCrossingIn)]);
+    }
+  }
+
   // Draw box
   const boxHeight = rows.length * rowH + 8;
   doc.rect(MARGIN, y - 4, CONTENT_WIDTH, boxHeight).lineWidth(0.5).strokeColor(COLOR_LIGHT_GRAY).stroke();
@@ -448,14 +476,25 @@ function renderDietTable(
   doc.text('ROZLICZENIE DIET', MARGIN, y);
   y += 14;
 
-  const columns: TableColumn[] = [
-    { header: 'Nr', width: 30, align: 'center' },
-    { header: 'Data', width: 75, align: 'center' },
-    { header: 'Godzin', width: 55, align: 'right' },
-    { header: 'Dieta naliczona', width: 95, align: 'right' },
-    { header: 'Pomniejszenia', width: 100, align: 'right' },
-    { header: 'Dieta netto', width: CONTENT_WIDTH - 30 - 75 - 55 - 95 - 100, align: 'right' },
-  ];
+  const isForeign = delegation.type === 'FOREIGN';
+  const columns: TableColumn[] = isForeign
+    ? [
+        { header: 'Nr', width: 25, align: 'center' },
+        { header: 'Data', width: 65, align: 'center' },
+        { header: 'Odcinek', width: 55, align: 'center' },
+        { header: 'Godzin', width: 45, align: 'right' },
+        { header: 'Dieta naliczona', width: 85, align: 'right' },
+        { header: 'Pomniejszenia', width: 90, align: 'right' },
+        { header: 'Dieta netto', width: CONTENT_WIDTH - 25 - 65 - 55 - 45 - 85 - 90, align: 'right' },
+      ]
+    : [
+        { header: 'Nr', width: 30, align: 'center' },
+        { header: 'Data', width: 75, align: 'center' },
+        { header: 'Godzin', width: 55, align: 'right' },
+        { header: 'Dieta naliczona', width: 95, align: 'right' },
+        { header: 'Pomniejszenia', width: 100, align: 'right' },
+        { header: 'Dieta netto', width: CONTENT_WIDTH - 30 - 75 - 55 - 95 - 100, align: 'right' },
+      ];
 
   const days = delegation.days;
   const rows: TableRow[] = [];
@@ -482,38 +521,79 @@ function renderDietTable(
       ? `-${formatDecimal(deductions)} (${deductionParts.join(', ')})`
       : '0,00';
 
-    rows.push({
-      cells: [
-        day.dayNumber.toString(),
-        formatDate(day.date),
-        formatDecimal(d2n(day.hoursInDay), 1),
-        formatPLN(base),
-        deductionText,
-        formatPLN(final_),
-      ],
-    });
+    if (isForeign) {
+      const segment = day.isForeign ? 'Zagr.' : 'Kraj.';
+      rows.push({
+        cells: [
+          day.dayNumber.toString(),
+          formatDate(day.date),
+          segment,
+          formatDecimal(d2n(day.hoursInDay), 1),
+          formatPLN(base),
+          deductionText,
+          formatPLN(final_),
+        ],
+      });
+    } else {
+      rows.push({
+        cells: [
+          day.dayNumber.toString(),
+          formatDate(day.date),
+          formatDecimal(d2n(day.hoursInDay), 1),
+          formatPLN(base),
+          deductionText,
+          formatPLN(final_),
+        ],
+      });
+    }
   }
 
   // Totals row
-  rows.push({
-    cells: [
-      '',
-      '',
-      'RAZEM',
-      formatPLN(totalBase),
-      totalDeductions > 0 ? `-${formatDecimal(totalDeductions)}` : '0,00',
-      formatPLN(totalFinal),
-    ],
-    bold: true,
-    separator: true,
-  });
+  if (isForeign) {
+    rows.push({
+      cells: [
+        '',
+        '',
+        '',
+        'RAZEM',
+        formatPLN(totalBase),
+        totalDeductions > 0 ? `-${formatDecimal(totalDeductions)}` : '0,00',
+        formatPLN(totalFinal),
+      ],
+      bold: true,
+      separator: true,
+    });
+  } else {
+    rows.push({
+      cells: [
+        '',
+        '',
+        'RAZEM',
+        formatPLN(totalBase),
+        totalDeductions > 0 ? `-${formatDecimal(totalDeductions)}` : '0,00',
+        formatPLN(totalFinal),
+      ],
+      bold: true,
+      separator: true,
+    });
+  }
 
   y = drawTable(doc, MARGIN, y, columns, rows);
   y += 6;
 
   // Rate note
   doc.font(FONT_NORMAL).fontSize(FONT_SIZE_SMALL).fillColor(COLOR_GRAY);
-  doc.text(`Stawka diety: ${formatPLN(45)} / dobe`, MARGIN, y);
+  if (delegation.type === 'FOREIGN') {
+    const domesticDietTotal = d2n(delegation.totalDomesticDiet);
+    const foreignDietTotal = d2n(delegation.totalForeignDiet);
+    doc.text(
+      `Dieta krajowa: ${formatPLN(domesticDietTotal)} | Dieta zagraniczna: ${formatPLN(foreignDietTotal)} (${delegation.foreignCurrency ?? ''})`,
+      MARGIN,
+      y
+    );
+  } else {
+    doc.text(`Stawka diety: ${formatPLN(45)} / dobe`, MARGIN, y);
+  }
   y += 16;
 
   return y;
@@ -770,12 +850,25 @@ function renderSummary(
   const valueX = boxX + boxWidth - 130;
   const rowH = LINE_HEIGHT + 4;
 
-  const summaryLines: [string, string, boolean][] = [
-    ['Diety:', formatPLN(dietTotal), false],
+  const isForeign = delegation.type === 'FOREIGN';
+  const domesticDietTotal = d2n(delegation.totalDomesticDiet);
+  const foreignDietTotal = d2n(delegation.totalForeignDiet);
+
+  const summaryLines: [string, string, boolean][] = isForeign
+    ? [
+        ['Diety (odcinek krajowy):', formatPLN(domesticDietTotal), false],
+        [`Diety (odcinek zagraniczny, ${delegation.foreignCurrency ?? ''}):`, formatPLN(foreignDietTotal), false],
+        ['Diety razem:', formatPLN(dietTotal), false],
+      ]
+    : [
+        ['Diety:', formatPLN(dietTotal), false],
+      ];
+
+  summaryLines.push(
     ['Noclegi:', formatPLN(accommodationTotal), false],
     ['Transport:', formatPLN(transportTotal), false],
     ['Koszty dodatkowe:', formatPLN(additionalTotal), false],
-  ];
+  );
 
   const totalLines: [string, string, boolean][] = [
     ['RAZEM:', formatPLN(grandTotal), true],

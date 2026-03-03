@@ -31,6 +31,26 @@ export async function updateMileageRate(id: string, data: any) {
   return response.data;
 }
 
+// Foreign Diet Rates
+export async function getForeignRates() {
+  const response = await apiClient.get('/admin/rates/foreign');
+  return response.data;
+}
+
+export async function createForeignRate(data: any) {
+  const response = await apiClient.post('/admin/rates/foreign', data);
+  return response.data;
+}
+
+export async function updateForeignRate(id: string, data: any) {
+  const response = await apiClient.patch(`/admin/rates/foreign/${id}`, data);
+  return response.data;
+}
+
+export async function deleteForeignRate(id: string) {
+  await apiClient.delete(`/admin/rates/foreign/${id}`);
+}
+
 // Company
 export async function getCompanyInfo() {
   const response = await apiClient.get('/admin/company');

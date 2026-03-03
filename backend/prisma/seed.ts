@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { seedForeignRates } from './foreign-rates-seed';
 
 const prisma = new PrismaClient();
 
@@ -46,6 +47,7 @@ async function seedDefaultRates() {
 
 async function main() {
   await seedDefaultRates();
+  await seedForeignRates(prisma);
   console.log('Seed completed');
 }
 
