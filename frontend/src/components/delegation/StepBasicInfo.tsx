@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useFormContext } from 'react-hook-form';
+import { Controller, useFormContext } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -66,6 +66,7 @@ export function StepBasicInfo() {
     register,
     watch,
     setValue,
+    control,
     formState: { errors },
   } = useFormContext<DelegationFormValues>();
 
@@ -114,7 +115,13 @@ export function StepBasicInfo() {
         <Label>Typ delegacji *</Label>
         <Select
           value={delegationType ?? 'DOMESTIC'}
-          onValueChange={(value) => setValue('type', value as any)}
+          onValueChange={(value) =>
+            setValue('type', value as any, {
+              shouldDirty: true,
+              shouldTouch: true,
+              shouldValidate: true,
+            })
+          }
         >
           <SelectTrigger>
             <SelectValue placeholder="Wybierz typ" />
@@ -160,7 +167,13 @@ export function StepBasicInfo() {
           <Label>Kraj docelowy *</Label>
           <Select
             value={watch('foreignCountry') ?? ''}
-            onValueChange={(value) => setValue('foreignCountry', value)}
+            onValueChange={(value) =>
+              setValue('foreignCountry', value, {
+                shouldDirty: true,
+                shouldTouch: true,
+                shouldValidate: true,
+              })
+            }
           >
             <SelectTrigger>
               <SelectValue placeholder="Wybierz kraj" />
@@ -188,10 +201,27 @@ export function StepBasicInfo() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="departureAt">Data i godzina wyjazdu *</Label>
-          <Input
-            id="departureAt"
-            type="datetime-local"
-            {...register('departureAt')}
+          <Controller
+            name="departureAt"
+            control={control}
+            render={({ field }) => (
+              <Input
+                id="departureAt"
+                type="datetime-local"
+                step={60}
+                value={field.value ?? ''}
+                onChange={(event) =>
+                  setValue('departureAt', event.target.value, {
+                    shouldDirty: true,
+                    shouldTouch: true,
+                    shouldValidate: true,
+                  })
+                }
+                onBlur={field.onBlur}
+                name={field.name}
+                ref={field.ref}
+              />
+            )}
           />
           {errors.departureAt && (
             <p className="text-sm text-destructive">
@@ -202,10 +232,27 @@ export function StepBasicInfo() {
 
         <div className="space-y-2">
           <Label htmlFor="returnAt">Data i godzina powrotu *</Label>
-          <Input
-            id="returnAt"
-            type="datetime-local"
-            {...register('returnAt')}
+          <Controller
+            name="returnAt"
+            control={control}
+            render={({ field }) => (
+              <Input
+                id="returnAt"
+                type="datetime-local"
+                step={60}
+                value={field.value ?? ''}
+                onChange={(event) =>
+                  setValue('returnAt', event.target.value, {
+                    shouldDirty: true,
+                    shouldTouch: true,
+                    shouldValidate: true,
+                  })
+                }
+                onBlur={field.onBlur}
+                name={field.name}
+                ref={field.ref}
+              />
+            )}
           />
           {errors.returnAt && (
             <p className="text-sm text-destructive">
@@ -222,10 +269,27 @@ export function StepBasicInfo() {
             <Label htmlFor="borderCrossingOut">
               Przekroczenie granicy (wyjazd z PL) *
             </Label>
-            <Input
-              id="borderCrossingOut"
-              type="datetime-local"
-              {...register('borderCrossingOut')}
+            <Controller
+              name="borderCrossingOut"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="borderCrossingOut"
+                  type="datetime-local"
+                  step={60}
+                  value={field.value ?? ''}
+                  onChange={(event) =>
+                    setValue('borderCrossingOut', event.target.value, {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                      shouldValidate: true,
+                    })
+                  }
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref}
+                />
+              )}
             />
             {errors.borderCrossingOut && (
               <p className="text-sm text-destructive">
@@ -238,10 +302,27 @@ export function StepBasicInfo() {
             <Label htmlFor="borderCrossingIn">
               Przekroczenie granicy (powrot do PL) *
             </Label>
-            <Input
-              id="borderCrossingIn"
-              type="datetime-local"
-              {...register('borderCrossingIn')}
+            <Controller
+              name="borderCrossingIn"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="borderCrossingIn"
+                  type="datetime-local"
+                  step={60}
+                  value={field.value ?? ''}
+                  onChange={(event) =>
+                    setValue('borderCrossingIn', event.target.value, {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                      shouldValidate: true,
+                    })
+                  }
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref}
+                />
+              )}
             />
             {errors.borderCrossingIn && (
               <p className="text-sm text-destructive">
