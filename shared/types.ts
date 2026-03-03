@@ -194,6 +194,7 @@ export interface ForeignCalculationResult {
     domesticTotal: string;
     foreignTotal: string;
     total: string;
+    foreignCurrency: string;
   };
   accommodation: {
     nights: Array<{ type: AccommodationType; amount: string; isForeign?: boolean; overLimit?: boolean }>;

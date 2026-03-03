@@ -142,6 +142,7 @@ export interface ForeignCalculationResult {
     domesticTotal: number;
     foreignTotal: number;
     total: number;
+    foreignCurrency: string;
   };
   accommodation: AccommodationResult;
   transport: TransportResult;
@@ -850,6 +851,7 @@ export async function calculateForeignDelegation(
       domesticTotal: domesticDietTotal,
       foreignTotal: foreignDietTotal,
       total: dietTotal,
+      foreignCurrency: foreignRate.currency,
     },
     accommodation: accommodationResult,
     transport: transportResult,

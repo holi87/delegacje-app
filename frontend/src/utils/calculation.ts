@@ -17,10 +17,11 @@ export interface NormalizedCalculationResult {
   };
   diet: {
     rateUsed: string | number | null;
-    days: CalculationDayResult[];
+    days: Array<CalculationDayResult & { isForeign?: boolean }>;
     total: string | number;
     domesticTotal?: string | number;
     foreignTotal?: string | number;
+    foreignCurrency?: string | null;
   };
   accommodation: {
     nights: Array<any>;
@@ -79,8 +80,14 @@ export function normalizeCalculationResult(
     const fullDays = Math.floor(totalHours / 24);
     const remainingHours = Math.max(0, totalHours - fullDays * 24);
     const days = [
-      ...(result.diet?.domesticDays ?? []),
-      ...(result.diet?.foreignDays ?? []),
+      ...(result.diet?.domesticDays ?? []).map((d) => ({
+        ...d,
+        isForeign: false,
+      })),
+      ...(result.diet?.foreignDays ?? []).map((d) => ({
+        ...d,
+        isForeign: true,
+      })),
     ].sort((a, b) => a.dayNumber - b.dayNumber);
 
     return {
@@ -98,6 +105,7 @@ export function normalizeCalculationResult(
         total: result.diet?.total ?? 0,
         domesticTotal: result.diet?.domesticTotal ?? 0,
         foreignTotal: result.diet?.foreignTotal ?? 0,
+        foreignCurrency: result.diet?.foreignCurrency ?? null,
       },
       accommodation: {
         nights: result.accommodation?.nights ?? [],
@@ -152,6 +160,7 @@ export function normalizeCalculationResult(
       rateUsed: result.diet?.rateUsed ?? null,
       days: result.diet?.days ?? [],
       total: result.diet?.total ?? 0,
+      foreignCurrency: null,
     },
     accommodation: {
       nights: result.accommodation?.nights ?? [],

@@ -6,10 +6,42 @@ const currencyFormatter = new Intl.NumberFormat('pl-PL', {
   currency: 'PLN',
 });
 
+function parseAmount(value: string | number): number {
+  return typeof value === 'string' ? parseFloat(value) : value;
+}
+
 export function formatCurrency(value: string | number): string {
-  const numericValue = typeof value === 'string' ? parseFloat(value) : value;
+  const numericValue = parseAmount(value);
   if (isNaN(numericValue)) return '0,00 zł';
   return currencyFormatter.format(numericValue);
+}
+
+export function formatCurrencyByCode(
+  value: string | number,
+  currency: string
+): string {
+  const code = (currency || 'PLN').toUpperCase();
+  const numericValue = parseAmount(value);
+  if (isNaN(numericValue)) {
+    return code === 'PLN' ? '0,00 zł' : `0,00 ${code}`;
+  }
+
+  if (code === 'PLN') {
+    return formatCurrency(numericValue);
+  }
+
+  try {
+    return new Intl.NumberFormat('pl-PL', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'code',
+    }).format(numericValue);
+  } catch {
+    return `${numericValue.toLocaleString('pl-PL', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} ${code}`;
+  }
 }
 
 export function formatDate(date: string): string {

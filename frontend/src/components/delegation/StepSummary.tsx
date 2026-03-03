@@ -13,7 +13,11 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertCircle, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatCurrency, formatDateTime } from '@/utils/formatters';
+import {
+  formatCurrency,
+  formatCurrencyByCode,
+  formatDateTime,
+} from '@/utils/formatters';
 import { createDelegation, calculateDelegation } from '@/api/delegations';
 import {
   normalizeCalculationResult,
@@ -41,6 +45,12 @@ function parseOptionalDecimal(
 ): number | null {
   if (value == null || value === '') return null;
   return parseDecimal(value, fieldName);
+}
+
+function toNumber(value: string | number | null | undefined): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 const TRANSPORT_LABELS: Record<string, string> = {
@@ -147,6 +157,22 @@ export function StepSummary({
   }
 
   const calc = normalizeCalculationResult(calculationResult);
+  const foreignCurrency = calc?.diet.foreignCurrency ?? null;
+  const formatDietAmount = (value: string | number, isForeign: boolean) => {
+    if (isForeign && foreignCurrency) {
+      return formatCurrencyByCode(value, foreignCurrency);
+    }
+    return formatCurrency(value);
+  };
+  const formatAccommodationAmount = (
+    value: string | number,
+    isForeign: boolean
+  ) => {
+    if (isForeign && foreignCurrency) {
+      return formatCurrencyByCode(value, foreignCurrency);
+    }
+    return formatCurrency(value);
+  };
 
   // No result yet
   if (!calc) {
@@ -227,7 +253,9 @@ export function StepSummary({
           Stawka diety:{' '}
           {calc.diet.rateUsed != null
             ? formatCurrency(calc.diet.rateUsed)
-            : 'wg stawki krajowej i zagranicznej'}
+            : calc.isForeign
+            ? `wg stawki krajowej (PLN) i zagranicznej (${foreignCurrency ?? 'waluta kraju'})`
+            : 'wg stawki krajowej'}
         </p>
         <div className="overflow-x-auto">
           <Table>
@@ -240,38 +268,51 @@ export function StepSummary({
                 <TableHead className="text-right">Dieta</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {calc.diet.days.map((day) => (
-                <TableRow key={day.dayNumber}>
-                  <TableCell>{day.dayNumber}</TableCell>
-                  <TableCell className="text-right">
-                    {Math.round(day.hours)}h
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(day.baseAmount)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {parseFloat(String(day.deductions.total)) > 0 ? (
-                      <span className="text-destructive">
-                        -{formatCurrency(day.deductions.total)}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">---</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(day.finalAmount)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
+              <TableBody>
+                {calc.diet.days.map((day) => {
+                  const isForeignDay = !!day.isForeign;
+                  return (
+                    <TableRow key={day.dayNumber}>
+                      <TableCell>{day.dayNumber}</TableCell>
+                      <TableCell className="text-right">
+                        {Math.round(day.hours)}h
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatDietAmount(day.baseAmount, isForeignDay)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {parseFloat(String(day.deductions.total)) > 0 ? (
+                          <span className="text-destructive">
+                            -{formatDietAmount(day.deductions.total, isForeignDay)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">---</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatDietAmount(day.finalAmount, isForeignDay)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={4} className="font-semibold">
                   Suma diet
                 </TableCell>
                 <TableCell className="text-right font-semibold">
-                  {formatCurrency(calc.diet.total)}
+                  {calc.isForeign ? (
+                    <span>
+                      {formatCurrency(calc.diet.domesticTotal ?? 0)} +{' '}
+                      {formatCurrencyByCode(
+                        calc.diet.foreignTotal ?? 0,
+                        foreignCurrency ?? 'PLN'
+                      )}
+                    </span>
+                  ) : (
+                    formatCurrency(calc.diet.total)
+                  )}
                 </TableCell>
               </TableRow>
             </TableFooter>
@@ -309,7 +350,7 @@ export function StepSummary({
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(night.amount)}
+                      {formatAccommodationAmount(night.amount, !!night.isForeign)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -320,7 +361,24 @@ export function StepSummary({
                     Suma noclegow
                   </TableCell>
                   <TableCell className="text-right font-semibold">
-                    {formatCurrency(calc.accommodation.total)}
+                    {calc.isForeign ? (
+                      <span>
+                        {formatCurrency(
+                          calc.accommodation.nights
+                            .filter((n) => !n.isForeign)
+                            .reduce((sum, n) => sum + toNumber(n.amount), 0)
+                        )}{' '}
+                        +{' '}
+                        {formatCurrencyByCode(
+                          calc.accommodation.nights
+                            .filter((n) => !!n.isForeign)
+                            .reduce((sum, n) => sum + toNumber(n.amount), 0),
+                          foreignCurrency ?? 'PLN'
+                        )}
+                      </span>
+                    ) : (
+                      formatCurrency(calc.accommodation.total)
+                    )}
                   </TableCell>
                 </TableRow>
               </TableFooter>

@@ -10,7 +10,12 @@ import {
   downloadDelegationPdf,
 } from '@/api/delegations';
 import { useAuthStore } from '@/stores/authStore';
-import { formatCurrency, formatDate, formatDateTime } from '@/utils/formatters';
+import {
+  formatCurrency,
+  formatCurrencyByCode,
+  formatDate,
+  formatDateTime,
+} from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -76,6 +81,12 @@ const VEHICLE_LABELS: Record<string, string> = {
   MOTORCYCLE: 'Motocykl',
   MOPED: 'Motorower',
 };
+
+function toNumber(value: string | number | null | undefined): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export default function DelegationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -218,6 +229,22 @@ export default function DelegationDetailPage() {
   const delegation = delegationData.delegation ?? delegationData;
   const status = delegation.status as string;
   const calc = normalizeCalculationResult(calculationData as ApiCalculationResult | undefined);
+  const foreignCurrency = calc?.diet.foreignCurrency ?? delegation.foreignCurrency ?? null;
+  const formatDietAmount = (value: string | number, isForeign: boolean) => {
+    if (isForeign && foreignCurrency) {
+      return formatCurrencyByCode(value, foreignCurrency);
+    }
+    return formatCurrency(value);
+  };
+  const formatAccommodationAmount = (
+    value: string | number,
+    isForeign: boolean
+  ) => {
+    if (isForeign && foreignCurrency) {
+      return formatCurrencyByCode(value, foreignCurrency);
+    }
+    return formatCurrency(value);
+  };
 
   const isMutating =
     submitMut.isPending ||
@@ -455,7 +482,9 @@ export default function DelegationDetailPage() {
                 Stawka:{' '}
                 {calc.diet.rateUsed != null
                   ? formatCurrency(calc.diet.rateUsed)
-                  : 'wg stawki krajowej i zagranicznej'}{' '}
+                  : calc.isForeign
+                  ? `wg stawki krajowej (PLN) i zagranicznej (${foreignCurrency ?? 'waluta kraju'})`
+                  : 'wg stawki krajowej'}{' '}
                 | Czas:{' '}
                 {calc.duration.fullDays} dob, {Math.round(calc.duration.remainingHours)}h
               </p>
@@ -470,29 +499,35 @@ export default function DelegationDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {calc.diet.days.map((day) => (
-                    <TableRow key={day.dayNumber}>
-                      <TableCell>{day.dayNumber}</TableCell>
-                      <TableCell className="text-right">
-                        {Math.round(day.hours)}h
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(day.baseAmount)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {parseFloat(String(day.deductions.total)) > 0 ? (
-                          <span className="text-destructive">
-                            -{formatCurrency(day.deductions.total)}
-                          </span>
-                        ) : (
-                          '---'
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(day.finalAmount)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {calc.diet.days.map((day) => {
+                    const isForeignDay = !!day.isForeign;
+                    return (
+                      <TableRow key={day.dayNumber}>
+                        <TableCell>{day.dayNumber}</TableCell>
+                        <TableCell className="text-right">
+                          {Math.round(day.hours)}h
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatDietAmount(day.baseAmount, isForeignDay)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {parseFloat(String(day.deductions.total)) > 0 ? (
+                            <span className="text-destructive">
+                              -{formatDietAmount(
+                                day.deductions.total,
+                                isForeignDay
+                              )}
+                            </span>
+                          ) : (
+                            '---'
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatDietAmount(day.finalAmount, isForeignDay)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
                 <TableFooter>
                   <TableRow>
@@ -500,7 +535,17 @@ export default function DelegationDetailPage() {
                       Suma diet
                     </TableCell>
                     <TableCell className="text-right font-semibold">
-                      {formatCurrency(calc.diet.total)}
+                      {calc.isForeign ? (
+                        <span>
+                          {formatCurrency(calc.diet.domesticTotal ?? 0)} +{' '}
+                          {formatCurrencyByCode(
+                            calc.diet.foreignTotal ?? 0,
+                            foreignCurrency ?? 'PLN'
+                          )}
+                        </span>
+                      ) : (
+                        formatCurrency(calc.diet.total)
+                      )}
                     </TableCell>
                   </TableRow>
                 </TableFooter>
@@ -538,7 +583,10 @@ export default function DelegationDetailPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(night.amount)}
+                          {formatAccommodationAmount(
+                            night.amount,
+                            !!night.isForeign
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -549,7 +597,24 @@ export default function DelegationDetailPage() {
                         Suma noclegow
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {formatCurrency(calc.accommodation.total)}
+                        {calc.isForeign ? (
+                          <span>
+                            {formatCurrency(
+                              calc.accommodation.nights
+                                .filter((n) => !n.isForeign)
+                                .reduce((sum, n) => sum + toNumber(n.amount), 0)
+                            )}{' '}
+                            +{' '}
+                            {formatCurrencyByCode(
+                              calc.accommodation.nights
+                                .filter((n) => !!n.isForeign)
+                                .reduce((sum, n) => sum + toNumber(n.amount), 0),
+                              foreignCurrency ?? 'PLN'
+                            )}
+                          </span>
+                        ) : (
+                          formatCurrency(calc.accommodation.total)
+                        )}
                       </TableCell>
                     </TableRow>
                   </TableFooter>
