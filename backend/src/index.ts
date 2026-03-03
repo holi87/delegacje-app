@@ -10,6 +10,7 @@ import { usersRoutes, profileRoutes } from './modules/users/users.routes.js';
 import { delegationsRoutes } from './modules/delegations/delegations.routes.js';
 import { ratesRoutes } from './modules/admin/rates.routes.js';
 import { companyRoutes } from './modules/admin/company.routes.js';
+import { delegationNumberingRoutes } from './modules/admin/delegation-numbering.routes.js';
 import { pdfRoutes } from './modules/pdf/pdf.routes.js';
 import { AppError } from './utils/errors.js';
 
@@ -76,6 +77,7 @@ async function buildApp() {
   await app.register(delegationsRoutes, { prefix: '/api/v1/delegations' });
   await app.register(ratesRoutes, { prefix: '/api/v1/admin/rates' });
   await app.register(companyRoutes, { prefix: '/api/v1/admin/company' });
+  await app.register(delegationNumberingRoutes, { prefix: '/api/v1/admin/delegation-numbering' });
   await app.register(pdfRoutes, { prefix: '/api/v1/delegations' });
 
   // Health check — verifies DB connectivity

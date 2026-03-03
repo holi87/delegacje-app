@@ -1,5 +1,11 @@
 import { PrismaClient, Prisma, DelegationStatus } from '@prisma/client';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../utils/errors.js';
+import {
+  DELEGATION_NUMBER_COUNTER_KEY,
+  DELEGATION_NUMBER_MAX_LENGTH,
+  formatDelegationNumber,
+  normalizeDelegationNumber,
+} from '../../utils/delegation-number.js';
 import { calculateDelegation, CalculationInput, CalculationResult } from './calculation.service.js';
 import { calculateForeignDelegation, ForeignDelegationInput, ForeignCalculationResult, findForeignRate } from './foreign-calculation.service.js';
 import type { CreateDelegationInput, UpdateDelegationInput } from './delegations.schema.js';
@@ -11,6 +17,102 @@ import type { CreateDelegationInput, UpdateDelegationInput } from './delegations
 function decimalToString(value: Prisma.Decimal | null | undefined): string | null {
   if (value == null) return null;
   return value.toString();
+}
+
+async function allocateDelegationNumber(tx: Prisma.TransactionClient): Promise<number> {
+  await tx.delegationNumberCounter.upsert({
+    where: { key: DELEGATION_NUMBER_COUNTER_KEY },
+    update: {},
+    create: {
+      key: DELEGATION_NUMBER_COUNTER_KEY,
+      nextValue: 1,
+    },
+  });
+
+  // Skip numbers that may already be occupied after manual counter reset.
+  while (true) {
+    const counter = await tx.delegationNumberCounter.update({
+      where: { key: DELEGATION_NUMBER_COUNTER_KEY },
+      data: { nextValue: { increment: 1 } },
+      select: { nextValue: true },
+    });
+
+    const candidate = counter.nextValue - 1;
+    const existing = await tx.delegation.findUnique({
+      where: { number: candidate },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+
+    // Fast-forward counter above currently used numbers to avoid long loops.
+    const maxUsed = await tx.delegation.aggregate({
+      _max: { number: true },
+    });
+    const nextFree = Math.max(counter.nextValue, (maxUsed._max.number ?? 0) + 1);
+
+    await tx.delegationNumberCounter.update({
+      where: { key: DELEGATION_NUMBER_COUNTER_KEY },
+      data: { nextValue: nextFree },
+    });
+  }
+}
+
+function assertDelegationNumberFormat(value: string) {
+  if (value.length > DELEGATION_NUMBER_MAX_LENGTH) {
+    throw new ValidationError(`Numer delegacji moze miec maksymalnie ${DELEGATION_NUMBER_MAX_LENGTH} znaki`);
+  }
+  if (!/^[A-Za-z0-9/_\-.]+$/.test(value)) {
+    throw new ValidationError('Numer delegacji zawiera niedozwolone znaki');
+  }
+}
+
+async function findDelegationByNumberLabel(
+  tx: Prisma.TransactionClient,
+  numberLabel: string,
+  excludeDelegationId?: string
+) {
+  const found = await tx.delegation.findFirst({
+    where: {
+      numberLabel: { equals: numberLabel, mode: 'insensitive' },
+      ...(excludeDelegationId
+        ? { id: { not: excludeDelegationId } }
+        : {}),
+    },
+    select: { id: true },
+  });
+  return found;
+}
+
+async function resolveDelegationNumberLabelForCreate(
+  tx: Prisma.TransactionClient,
+  input: CreateDelegationInput
+) {
+  const proposed = normalizeDelegationNumber(input.proposedNumber);
+  if (proposed) {
+    assertDelegationNumberFormat(proposed);
+    const existing = await findDelegationByNumberLabel(tx, proposed);
+    if (existing) {
+      throw new ValidationError('Numer delegacji juz istnieje');
+    }
+  }
+
+  while (true) {
+    const numericNumber = await allocateDelegationNumber(tx);
+    const autoLabel = formatDelegationNumber(numericNumber, new Date())!;
+    const numberLabel = proposed ?? autoLabel;
+
+    const existing = await findDelegationByNumberLabel(tx, numberLabel);
+    if (!existing) {
+      return { numericNumber, numberLabel };
+    }
+
+    if (proposed) {
+      throw new ValidationError('Numer delegacji juz istnieje');
+    }
+  }
 }
 
 /**
@@ -43,6 +145,8 @@ const fullDelegationInclude = {
 function serializeDelegation(delegation: any) {
   return {
     id: delegation.id,
+    number: delegation.numberLabel ?? formatDelegationNumber(delegation.number, delegation.createdAt),
+    numberValue: delegation.number,
     userId: delegation.userId,
     type: delegation.type,
     status: delegation.status,
@@ -203,76 +307,82 @@ export async function createDelegation(
   userId: string,
   input: CreateDelegationInput
 ) {
-  const delegation = await prisma.delegation.create({
-    data: {
-      userId,
-      type: input.type as any,
-      status: 'DRAFT',
-      purpose: input.purpose,
-      destination: input.destination,
-      departureAt: new Date(input.departureAt),
-      returnAt: new Date(input.returnAt),
-      transportType: input.transportType as any,
-      vehicleType: input.vehicleType as any ?? null,
-      transportNotes: input.transportNotes ?? null,
-      accommodationType: input.accommodationType as any,
-      advanceAmount: new Prisma.Decimal(input.advanceAmount),
-      foreignCountry: input.foreignCountry ?? null,
-      borderCrossingOut: input.borderCrossingOut ? new Date(input.borderCrossingOut) : null,
-      borderCrossingIn: input.borderCrossingIn ? new Date(input.borderCrossingIn) : null,
-      days: {
-        create: input.days.map((day) => ({
-          dayNumber: day.dayNumber,
-          date: new Date(day.date),
-          hoursInDay: 0, // Will be calculated when calculate is called
-          breakfastProvided: day.breakfastProvided,
-          lunchProvided: day.lunchProvided,
-          dinnerProvided: day.dinnerProvided,
-          accommodationType: day.accommodationType as any,
-          accommodationCost: day.accommodationCost != null
-            ? new Prisma.Decimal(day.accommodationCost)
-            : null,
-          isForeign: day.isForeign ?? false,
-        })),
-      },
-      ...(input.mileageDetails
-        ? {
-            mileageDetails: {
-              create: {
-                vehicleType: input.mileageDetails.vehicleType as any,
-                vehiclePlate: input.mileageDetails.vehiclePlate,
-                distanceKm: new Prisma.Decimal(input.mileageDetails.distanceKm),
-                ratePerKm: 0, // Will be set when calculation is run
-                totalAmount: 0, // Will be set when calculation is run
+  const delegation = await prisma.$transaction(async (tx) => {
+    const { numericNumber, numberLabel } = await resolveDelegationNumberLabelForCreate(tx, input);
+
+    return tx.delegation.create({
+      data: {
+        number: numericNumber,
+        numberLabel,
+        userId,
+        type: input.type as any,
+        status: 'DRAFT',
+        purpose: input.purpose,
+        destination: input.destination,
+        departureAt: new Date(input.departureAt),
+        returnAt: new Date(input.returnAt),
+        transportType: input.transportType as any,
+        vehicleType: input.vehicleType as any ?? null,
+        transportNotes: input.transportNotes ?? null,
+        accommodationType: input.accommodationType as any,
+        advanceAmount: new Prisma.Decimal(input.advanceAmount),
+        foreignCountry: input.foreignCountry ?? null,
+        borderCrossingOut: input.borderCrossingOut ? new Date(input.borderCrossingOut) : null,
+        borderCrossingIn: input.borderCrossingIn ? new Date(input.borderCrossingIn) : null,
+        days: {
+          create: input.days.map((day) => ({
+            dayNumber: day.dayNumber,
+            date: new Date(day.date),
+            hoursInDay: 0, // Will be calculated when calculate is called
+            breakfastProvided: day.breakfastProvided,
+            lunchProvided: day.lunchProvided,
+            dinnerProvided: day.dinnerProvided,
+            accommodationType: day.accommodationType as any,
+            accommodationCost: day.accommodationCost != null
+              ? new Prisma.Decimal(day.accommodationCost)
+              : null,
+            isForeign: day.isForeign ?? false,
+          })),
+        },
+        ...(input.mileageDetails
+          ? {
+              mileageDetails: {
+                create: {
+                  vehicleType: input.mileageDetails.vehicleType as any,
+                  vehiclePlate: input.mileageDetails.vehiclePlate,
+                  distanceKm: new Prisma.Decimal(input.mileageDetails.distanceKm),
+                  ratePerKm: 0, // Will be set when calculation is run
+                  totalAmount: 0, // Will be set when calculation is run
+                },
               },
-            },
-          }
-        : {}),
-      ...(input.transportReceipts && input.transportReceipts.length > 0
-        ? {
-            transportReceipts: {
-              create: input.transportReceipts.map((r) => ({
-                description: r.description,
-                amount: new Prisma.Decimal(r.amount),
-                receiptNumber: r.receiptNumber ?? null,
-              })),
-            },
-          }
-        : {}),
-      ...(input.additionalCosts && input.additionalCosts.length > 0
-        ? {
-            additionalCosts: {
-              create: input.additionalCosts.map((c) => ({
-                description: c.description,
-                category: c.category,
-                amount: new Prisma.Decimal(c.amount),
-                receiptNumber: c.receiptNumber ?? null,
-              })),
-            },
-          }
-        : {}),
-    },
-    include: fullDelegationInclude,
+            }
+          : {}),
+        ...(input.transportReceipts && input.transportReceipts.length > 0
+          ? {
+              transportReceipts: {
+                create: input.transportReceipts.map((r) => ({
+                  description: r.description,
+                  amount: new Prisma.Decimal(r.amount),
+                  receiptNumber: r.receiptNumber ?? null,
+                })),
+              },
+            }
+          : {}),
+        ...(input.additionalCosts && input.additionalCosts.length > 0
+          ? {
+              additionalCosts: {
+                create: input.additionalCosts.map((c) => ({
+                  description: c.description,
+                  category: c.category,
+                  amount: new Prisma.Decimal(c.amount),
+                  receiptNumber: c.receiptNumber ?? null,
+                })),
+              },
+            }
+          : {}),
+      },
+      include: fullDelegationInclude,
+    });
   });
 
   return serializeDelegation(delegation);
@@ -398,6 +508,24 @@ export async function updateDelegation(
           })),
         });
       }
+    }
+
+    if (input.proposedNumber !== undefined) {
+      const normalized = normalizeDelegationNumber(input.proposedNumber);
+      const targetNumberLabel = normalized ?? formatDelegationNumber(existing.number, existing.createdAt)!;
+
+      assertDelegationNumberFormat(targetNumberLabel);
+
+      const conflict = await findDelegationByNumberLabel(
+        tx,
+        targetNumberLabel,
+        delegationId
+      );
+      if (conflict) {
+        throw new ValidationError('Numer delegacji juz istnieje');
+      }
+
+      updateData.numberLabel = targetNumberLabel;
     }
 
     // Update the main delegation record

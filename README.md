@@ -2,11 +2,13 @@
 
 Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i wspólników spółki. Zgodna z polskim prawem.
 
-**Aktualna wersja:** `1.1.0` (2026-03-04)
+**Aktualna wersja:** `1.2.0` (2026-03-04)
 
 ## Funkcje
 
 - Tworzenie i rozliczanie delegacji krajowych i zagranicznych
+- Automatyczna numeracja delegacji (kolejny numer) + reset numeracji przez admina
+- Opcjonalny własny numer delegacji podawany przez użytkownika (z walidacją unikalności)
 - Obliczanie diet wg aktualnych stawek (konfigurowalne w panelu admina)
 - Delegacje zagraniczne: dwuodcinkowy model (krajowy + zagraniczny), stawki per kraj
 - Kilometrówka z wyborem typu pojazdu
@@ -234,6 +236,14 @@ Własnościowa / wewnętrzna. Do użytku w ramach spółki.
 
 ## Changelog
 
+### [1.2.0] - 2026-03-04
+- Personalizacja i identyfikacja dokumentów:
+  - Zmieniony placeholder numeru delegacji na neutralny wzorzec `XYZ_DK_001`
+  - Stopka PDF rozszerzona o metkę aplikacji: `Delegacje-APP v1.2.0 / https://github.com/holi87/delegacje-app`
+- Poprawki językowe PDF:
+  - Ujednolicenie polskich znaków diakrytycznych w stałych etykietach i opisach (np. `wypłaty`, `podróży`, `oświadczam`)
+  - Poprawa zapisu kwoty słownie (`zł`, `tysiąc`, `tysięcy`, itd.)
+
 ### [1.1.0] - 2026-03-04
 - Poprawki stabilizacyjne i UX:
   - Naprawa błędu 500 przy logowaniu (JWT refresh token)
@@ -247,6 +257,8 @@ Własnościowa / wewnętrzna. Do użytku w ramach spółki.
   - Prawidłowa edycja delegacji na istniejącym rekordzie (`/delegations/:id/edit`)
   - Poprawne symbole walut dla delegacji zagranicznych (np. `AUD` zamiast `zł`)
   - Rozdzielenie krajowych i zagranicznych limitów/ryczałtów noclegowych w UI
+  - Trwała numeracja delegacji (DB), widoczna w aplikacji i PDF + reset numeru przez admina
+  - Obsługa własnych numerów delegacji (np. `XYZ_DK_001`) z fallbackiem do numeru automatycznego
 
 ### [1.0.0] - 2026-03-03
 - Faza 2: Delegacje zagraniczne

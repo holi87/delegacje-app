@@ -8,6 +8,12 @@ const delegationTypeEnum = z.enum(['DOMESTIC', 'FOREIGN']);
 const transportTypeEnum = z.enum(['COMPANY_VEHICLE', 'PUBLIC_TRANSPORT', 'PRIVATE_VEHICLE', 'MIXED']);
 const vehicleTypeEnum = z.enum(['CAR_ABOVE_900', 'CAR_BELOW_900', 'MOTORCYCLE', 'MOPED']);
 const accommodationTypeEnum = z.enum(['RECEIPT', 'LUMP_SUM', 'FREE', 'NONE']);
+const delegationNumberSchema = z
+  .string()
+  .trim()
+  .min(1, 'Numer delegacji nie moze byc pusty')
+  .max(64, 'Numer delegacji moze miec maksymalnie 64 znaki')
+  .regex(/^[A-Za-z0-9/_\-\.]+$/, 'Numer delegacji zawiera niedozwolone znaki');
 
 // =====================
 // Sub-schemas
@@ -53,6 +59,7 @@ const additionalCostSchema = z.object({
 export const createDelegationSchema = z
   .object({
     type: delegationTypeEnum.default('DOMESTIC'),
+    proposedNumber: delegationNumberSchema.nullable().optional(),
     purpose: z.string().min(1, 'Cel delegacji jest wymagany'),
     destination: z.string().min(1, 'Miejsce delegacji jest wymagane'),
     departureAt: z.string().datetime({ message: 'Nieprawidłowy format daty wyjazdu (ISO 8601)' }),
@@ -114,6 +121,7 @@ export type CreateDelegationInput = z.infer<typeof createDelegationSchema>;
 export const updateDelegationSchema = z
   .object({
     type: delegationTypeEnum.optional(),
+    proposedNumber: delegationNumberSchema.nullable().optional(),
     purpose: z.string().min(1, 'Cel delegacji jest wymagany').optional(),
     destination: z.string().min(1, 'Miejsce delegacji jest wymagane').optional(),
     departureAt: z.string().datetime({ message: 'Nieprawidłowy format daty wyjazdu (ISO 8601)' }).optional(),

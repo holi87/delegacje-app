@@ -133,6 +133,24 @@ export function StepBasicInfo() {
         </Select>
       </div>
 
+      {/* Optional delegation number */}
+      <div className="space-y-2">
+        <Label htmlFor="proposedNumber">Numer delegacji (opcjonalnie)</Label>
+        <Input
+          id="proposedNumber"
+          placeholder="np. 0001/DEL/2026 albo XYZ_DK_001"
+          {...register('proposedNumber')}
+        />
+        <p className="text-xs text-muted-foreground">
+          Jesli pole pozostanie puste, system nada numer automatycznie.
+        </p>
+        {errors.proposedNumber && (
+          <p className="text-sm text-destructive">
+            {(errors.proposedNumber as any).message}
+          </p>
+        )}
+      </div>
+
       {/* Purpose */}
       <div className="space-y-2">
         <Label htmlFor="purpose">Cel delegacji *</Label>

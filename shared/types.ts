@@ -40,6 +40,11 @@ export interface CompanyInfo {
   postalCode: string;
 }
 
+export interface DelegationNumberingSettings {
+  nextNumber: number;
+  previewNumber: string;
+}
+
 export interface DomesticRate {
   id: string;
   dailyDiet: string;
@@ -107,6 +112,7 @@ export interface AdditionalCostInput {
 
 export interface DelegationInput {
   type: DelegationType;
+  proposedNumber?: string | null;
   purpose: string;
   destination: string;
   departureAt: string;

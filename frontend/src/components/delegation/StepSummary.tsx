@@ -18,7 +18,7 @@ import {
   formatCurrencyByCode,
   formatDateTime,
 } from '@/utils/formatters';
-import { createDelegation, calculateDelegation } from '@/api/delegations';
+import { createDelegation, updateDelegation, calculateDelegation } from '@/api/delegations';
 import {
   normalizeCalculationResult,
   type ApiCalculationResult,
@@ -69,12 +69,14 @@ const ACCOMMODATION_LABELS: Record<string, string> = {
 
 interface StepSummaryProps {
   delegationId?: string;
+  ensureDelegationId?: (data: DelegationFormValues) => Promise<string>;
   calculationResult: ApiCalculationResult | null;
   onCalculationResult: (result: ApiCalculationResult | null) => void;
 }
 
 export function StepSummary({
   delegationId,
+  ensureDelegationId,
   calculationResult,
   onCalculationResult,
 }: StepSummaryProps) {
@@ -95,17 +97,24 @@ export function StepSummary({
 
     try {
       let id = delegationId;
+      const payload = buildApiPayload(formData);
 
-      // If no delegation exists yet, create a temporary draft
+      // Ensure a draft id exists. In new delegation flow this callback deduplicates create calls.
       if (!id) {
-        const payload = buildApiPayload(formData);
-        const created = await createDelegation(payload);
-        id = created.delegation?.id ?? created.id;
+        if (ensureDelegationId) {
+          id = await ensureDelegationId(formData);
+        } else {
+          const created = await createDelegation(payload);
+          id = created.delegation?.id ?? created.id;
+        }
       }
 
       if (!id) {
         throw new Error('Nie udalo sie utworzyc delegacji do obliczen.');
       }
+
+      // Keep DB in sync with current wizard values before calculation.
+      await updateDelegation(id, payload);
 
       const result = await calculateDelegation(id);
       onCalculationResult(result);
@@ -557,8 +566,11 @@ export function StepSummary({
 // ---------- Helpers ----------
 
 function buildApiPayload(data: DelegationFormValues) {
+  const proposedNumber = data.proposedNumber?.trim();
+
   return {
     type: data.type ?? 'DOMESTIC',
+    proposedNumber: proposedNumber ? proposedNumber : null,
     purpose: data.purpose,
     destination: data.destination,
     departureAt: new Date(data.departureAt).toISOString(),

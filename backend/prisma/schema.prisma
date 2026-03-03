@@ -84,6 +84,8 @@ enum AccommodationType {
 
 model Delegation {
   id   String           @id @default(uuid())
+  number Int            @unique
+  numberLabel String    @unique @map("number_label")
   userId String         @map("user_id")
   type   DelegationType @default(DOMESTIC)
   status DelegationStatus @default(DRAFT)
@@ -268,4 +270,11 @@ model CompanyInfo {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@map("company_info")
+}
+
+model DelegationNumberCounter {
+  key       String @id
+  nextValue Int    @default(1) @map("next_value")
+
+  @@map("delegation_number_counter")
 }

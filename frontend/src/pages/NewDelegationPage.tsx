@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -34,8 +34,11 @@ function parseOptionalDecimal(
 }
 
 function buildApiPayload(data: DelegationFormValues) {
+  const proposedNumber = data.proposedNumber?.trim();
+
   return {
     type: data.type ?? 'DOMESTIC',
+    proposedNumber: proposedNumber ? proposedNumber : null,
     purpose: data.purpose,
     destination: data.destination,
     departureAt: new Date(data.departureAt).toISOString(),
@@ -85,15 +88,40 @@ export default function NewDelegationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [draftId, setDraftId] = useState<string | null>(null);
+  const creatingDraftPromiseRef = useRef<Promise<string> | null>(null);
+
+  const ensureDelegationId = async (data: DelegationFormValues): Promise<string> => {
+    if (draftId) {
+      return draftId;
+    }
+
+    if (creatingDraftPromiseRef.current) {
+      return creatingDraftPromiseRef.current;
+    }
+
+    const payload = buildApiPayload(data);
+    const createPromise = createDelegation(payload)
+      .then((created) => {
+        const id = created?.delegation?.id ?? created?.id;
+        if (!id) {
+          throw new Error('Nie udalo sie utworzyc delegacji.');
+        }
+        setDraftId(id);
+        return id;
+      })
+      .finally(() => {
+        creatingDraftPromiseRef.current = null;
+      });
+
+    creatingDraftPromiseRef.current = createPromise;
+    return createPromise;
+  };
 
   const saveDraftMutation = useMutation({
     mutationFn: async (data: DelegationFormValues) => {
       const payload = buildApiPayload(data);
-
-      if (draftId) {
-        return updateDelegation(draftId, payload);
-      }
-      return createDelegation(payload);
+      const id = await ensureDelegationId(data);
+      return updateDelegation(id, payload);
     },
     onSuccess: (result) => {
       const id = result?.delegation?.id ?? result?.id;
@@ -115,16 +143,8 @@ export default function NewDelegationPage() {
   const submitMutation = useMutation({
     mutationFn: async (data: DelegationFormValues) => {
       const payload = buildApiPayload(data);
-
-      let id = draftId;
-
-      // Create or update the delegation first
-      if (id) {
-        await updateDelegation(id, payload);
-      } else {
-        const created = await createDelegation(payload);
-        id = created?.delegation?.id ?? created?.id;
-      }
+      const id = await ensureDelegationId(data);
+      await updateDelegation(id, payload);
 
       if (!id) {
         throw new Error('Nie udalo sie utworzyc delegacji.');
@@ -169,6 +189,7 @@ export default function NewDelegationPage() {
 
       <DelegationWizard
         delegationId={draftId ?? undefined}
+        ensureDelegationId={ensureDelegationId}
         onSaveDraft={handleSaveDraft}
         onSubmit={handleSubmit}
         isSaving={isSaving}

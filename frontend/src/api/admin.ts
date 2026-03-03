@@ -1,4 +1,5 @@
 import apiClient from './client';
+import type { DelegationNumberingSettings } from '../../../shared/types';
 
 // Rates
 export async function getDomesticRates() {
@@ -60,6 +61,19 @@ export async function getCompanyInfo() {
 export async function updateCompanyInfo(data: any) {
   const response = await apiClient.patch('/admin/company', data);
   return response.data?.companyInfo ?? response.data;
+}
+
+// Delegation numbering
+export async function getDelegationNumbering() {
+  const response = await apiClient.get('/admin/delegation-numbering');
+  return response.data?.numbering ?? response.data;
+}
+
+export async function updateDelegationNumbering(nextNumber: number): Promise<DelegationNumberingSettings> {
+  const response = await apiClient.patch('/admin/delegation-numbering', {
+    nextNumber,
+  });
+  return response.data?.numbering ?? response.data;
 }
 
 // Users

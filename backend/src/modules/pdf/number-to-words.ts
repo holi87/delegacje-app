@@ -3,57 +3,57 @@
  * Handles amounts up to 999 999,99 PLN.
  *
  * Output format examples:
- *   1 101.25 => "jeden tysiac sto jeden zl 25/100"
- *   0.50     => "zero zl 50/100"
- *   45.00    => "czterdziesci piec zl 00/100"
+ *   1 101.25 => "jeden tysiąc sto jeden zł 25/100"
+ *   0.50     => "zero zł 50/100"
+ *   45.00    => "czterdzieści pięć zł 00/100"
  */
 
 const ONES = [
-  '', 'jeden', 'dwa', 'trzy', 'cztery', 'piec', 'szesc',
-  'siedem', 'osiem', 'dziewiec',
+  '', 'jeden', 'dwa', 'trzy', 'cztery', 'pięć', 'sześć',
+  'siedem', 'osiem', 'dziewięć',
 ];
 
 const TEENS = [
-  'dziesiec', 'jedenascie', 'dwanascie', 'trzynascie', 'czternascie',
-  'pietnascie', 'szesnascie', 'siedemnascie', 'osiemnascie', 'dziewietnascie',
+  'dziesięć', 'jedenaście', 'dwanaście', 'trzynaście', 'czternaście',
+  'piętnaście', 'szesnaście', 'siedemnaście', 'osiemnaście', 'dziewiętnaście',
 ];
 
 const TENS = [
-  '', 'dziesiec', 'dwadziescia', 'trzydziesci', 'czterdziesci',
-  'piecdziesiat', 'szescdziesiat', 'siedemdziesiat', 'osiemdziesiat',
-  'dziewiecdziesiat',
+  '', 'dziesięć', 'dwadzieścia', 'trzydzieści', 'czterdzieści',
+  'pięćdziesiąt', 'sześćdziesiąt', 'siedemdziesiąt', 'osiemdziesiąt',
+  'dziewięćdziesiąt',
 ];
 
 const HUNDREDS = [
-  '', 'sto', 'dwiescie', 'trzysta', 'czterysta', 'piecset',
-  'szescset', 'siedemset', 'osiemset', 'dziewiecset',
+  '', 'sto', 'dwieście', 'trzysta', 'czterysta', 'pięćset',
+  'sześćset', 'siedemset', 'osiemset', 'dziewięćset',
 ];
 
 /**
- * Determine the correct Polish plural form for "tysiac" (thousand).
+ * Determine the correct Polish plural form for "tysiąc" (thousand).
  *
  * Polish rules:
- *   1           => "tysiac"
- *   2-4         => "tysiace"  (but not 12-14)
- *   5-21        => "tysiecy"
- *   22-24       => "tysiace"
- *   25-31       => "tysiecy"
+ *   1           => "tysiąc"
+ *   2-4         => "tysiące"  (but not 12-14)
+ *   5-21        => "tysięcy"
+ *   22-24       => "tysiące"
+ *   25-31       => "tysięcy"
  *   ... and so on (last two digits determine form)
  */
 function thousandForm(n: number): string {
-  if (n === 1) return 'tysiac';
+  if (n === 1) return 'tysiąc';
 
   const lastTwo = n % 100;
   const lastOne = n % 10;
 
-  // Teens (11-19) always get "tysiecy"
-  if (lastTwo >= 12 && lastTwo <= 14) return 'tysiecy';
+  // Teens (11-19) always get "tysięcy"
+  if (lastTwo >= 12 && lastTwo <= 14) return 'tysięcy';
 
-  // 2, 3, 4 (and 22-24, 32-34, etc.) get "tysiace"
-  if (lastOne >= 2 && lastOne <= 4) return 'tysiace';
+  // 2, 3, 4 (and 22-24, 32-34, etc.) get "tysiące"
+  if (lastOne >= 2 && lastOne <= 4) return 'tysiące';
 
-  // Everything else gets "tysiecy"
-  return 'tysiecy';
+  // Everything else gets "tysięcy"
+  return 'tysięcy';
 }
 
 /**
@@ -91,7 +91,7 @@ function convertGroup(n: number): string {
  * Convert a monetary amount (in PLN) to Polish words.
  *
  * @param amount - The amount as a number (e.g. 1101.25)
- * @returns Polish words string, e.g. "jeden tysiac sto jeden zl 25/100"
+ * @returns Polish words string, e.g. "jeden tysiąc sto jeden zł 25/100"
  *
  * Supports amounts from 0.00 to 999 999.99.
  * For negative amounts, prepends "minus".
@@ -107,7 +107,7 @@ export function amountToWords(amount: number): string {
 
   if (zloty > 999999) {
     // Fallback for amounts exceeding supported range
-    return `${isNegative ? 'minus ' : ''}${zloty} zl ${grosze.toString().padStart(2, '0')}/100`;
+    return `${isNegative ? 'minus ' : ''}${zloty} zł ${grosze.toString().padStart(2, '0')}/100`;
   }
 
   let words: string;
@@ -122,7 +122,7 @@ export function amountToWords(amount: number): string {
 
     if (thousands > 0) {
       if (thousands === 1) {
-        parts.push('jeden tysiac');
+        parts.push('jeden tysiąc');
       } else {
         const thousandWords = convertGroup(thousands);
         parts.push(`${thousandWords} ${thousandForm(thousands)}`);
@@ -139,5 +139,5 @@ export function amountToWords(amount: number): string {
   const prefix = isNegative ? 'minus ' : '';
   const groszeStr = grosze.toString().padStart(2, '0');
 
-  return `${prefix}${words} zl ${groszeStr}/100`;
+  return `${prefix}${words} zł ${groszeStr}/100`;
 }

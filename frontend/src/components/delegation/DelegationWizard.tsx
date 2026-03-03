@@ -56,6 +56,13 @@ const mileageDetailsSchema = z.object({
 
 export const delegationFormSchema = z
   .object({
+    proposedNumber: z
+      .string()
+      .trim()
+      .max(64, 'Numer delegacji moze miec maksymalnie 64 znaki')
+      .regex(/^[A-Za-z0-9/_\-.]*$/, 'Numer delegacji zawiera niedozwolone znaki')
+      .nullable()
+      .optional(),
     purpose: z.string().min(1, 'Cel delegacji jest wymagany'),
     destination: z.string().min(1, 'Miejsce delegacji jest wymagane'),
     departureAt: z.string().min(1, 'Data wyjazdu jest wymagana'),
@@ -131,7 +138,7 @@ const STEPS = [
 
 // Fields to validate per step (partial validation on Next)
 const STEP_FIELDS: Record<number, (keyof DelegationFormValues)[]> = {
-  1: ['purpose', 'destination', 'departureAt', 'returnAt', 'type'],
+  1: ['proposedNumber', 'purpose', 'destination', 'departureAt', 'returnAt', 'type'],
   2: ['transportType', 'mileageDetails', 'transportReceipts'],
   3: ['accommodationType', 'days'],
   4: ['days'],
@@ -147,6 +154,8 @@ interface DelegationWizardProps {
   initialValues?: Partial<DelegationFormValues>;
   /** Existing delegation id (for editing) */
   delegationId?: string;
+  /** Resolve draft delegation id (used in new flow to avoid duplicate creates) */
+  ensureDelegationId?: (data: DelegationFormValues) => Promise<string>;
   /** Called when user saves as draft */
   onSaveDraft: (data: DelegationFormValues) => Promise<void>;
   /** Called when user submits the delegation */
@@ -158,6 +167,7 @@ interface DelegationWizardProps {
 export function DelegationWizard({
   initialValues,
   delegationId,
+  ensureDelegationId,
   onSaveDraft,
   onSubmit,
   isSaving = false,
@@ -169,6 +179,7 @@ export function DelegationWizard({
   const methods = useForm<DelegationFormValues>({
     resolver: zodResolver(delegationFormSchema),
     defaultValues: {
+      proposedNumber: null,
       purpose: '',
       destination: '',
       departureAt: '',
@@ -310,6 +321,7 @@ export function DelegationWizard({
             {currentStep === 7 && (
               <StepSummary
                 delegationId={delegationId}
+                ensureDelegationId={ensureDelegationId}
                 calculationResult={calculationResult}
                 onCalculationResult={setCalculationResult}
               />

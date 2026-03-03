@@ -61,8 +61,11 @@ function toNumber(value: unknown, fallback = 0): number {
 }
 
 function buildApiPayload(data: DelegationFormValues) {
+  const proposedNumber = data.proposedNumber?.trim();
+
   return {
     type: data.type ?? 'DOMESTIC',
+    proposedNumber: proposedNumber ? proposedNumber : null,
     purpose: data.purpose,
     destination: data.destination,
     departureAt: new Date(data.departureAt).toISOString(),
@@ -114,6 +117,7 @@ function buildApiPayload(data: DelegationFormValues) {
 
 function mapDelegationToFormValues(delegation: any): DelegationFormValues {
   return {
+    proposedNumber: delegation.number ?? null,
     purpose: delegation.purpose ?? '',
     destination: delegation.destination ?? '',
     departureAt: toDateTimeLocalValue(delegation.departureAt),
