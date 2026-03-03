@@ -95,10 +95,6 @@ export async function usersRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  // Profile routes
-  app.get('/profile', { preHandler: [authenticate] }, async (request, reply) => {
-    // Redirect to /api/v1/profile - registered separately below
-  });
 }
 
 // Separate profile routes (mounted at /api/v1 in index.ts if needed)

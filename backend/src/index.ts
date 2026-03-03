@@ -5,7 +5,7 @@ import corsPlugin from './plugins/cors.js';
 import authPlugin from './plugins/auth.js';
 import { setupRoutes } from './modules/setup/setup.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
-import { usersRoutes } from './modules/users/users.routes.js';
+import { usersRoutes, profileRoutes } from './modules/users/users.routes.js';
 import { delegationsRoutes } from './modules/delegations/delegations.routes.js';
 import { ratesRoutes } from './modules/admin/rates.routes.js';
 import { companyRoutes } from './modules/admin/company.routes.js';
@@ -70,6 +70,7 @@ async function buildApp() {
   await app.register(setupRoutes, { prefix: '/api/v1/setup' });
   await app.register(authRoutes, { prefix: '/api/v1/auth' });
   await app.register(usersRoutes, { prefix: '/api/v1/users' });
+  await app.register(profileRoutes, { prefix: '/api/v1/profile' });
   await app.register(delegationsRoutes, { prefix: '/api/v1/delegations' });
   await app.register(ratesRoutes, { prefix: '/api/v1/admin/rates' });
   await app.register(companyRoutes, { prefix: '/api/v1/admin/company' });
