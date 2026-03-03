@@ -2,6 +2,8 @@
 
 Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i wspólników spółki. Zgodna z polskim prawem.
 
+**Aktualna wersja:** `1.1.0` (2026-03-04)
+
 ## Funkcje
 
 - Tworzenie i rozliczanie delegacji krajowych i zagranicznych
@@ -221,7 +223,7 @@ Stawki konfigurowane przez admina — przy zmianie przepisów wystarczy zaktuali
 ## Plan rozwoju
 
 - **Faza 1** (zrealizowana): Delegacje krajowe
-- **Faza 2** (zrealizowana): Delegacje zagraniczne (48 krajów, dwuodcinkowy model)
+- **Faza 2** (zrealizowana): Delegacje zagraniczne (115 krajów, dwuodcinkowy model)
 - **Faza 3** (planowana): Eksport do księgowości, powiadomienia email
 
 ## Licencja
@@ -232,10 +234,24 @@ Własnościowa / wewnętrzna. Do użytku w ramach spółki.
 
 ## Changelog
 
-### [Unreleased]
+### [1.1.0] - 2026-03-04
+- Poprawki stabilizacyjne i UX:
+  - Naprawa błędu 500 przy logowaniu (JWT refresh token)
+  - Frontend wystawiony na porcie `8250` (konfiguracja + dokumentacja)
+  - Poprawiona obsługa seeda i stawek zagranicznych (115 krajów)
+  - Naprawa walidacji daty powrotu w kreatorze delegacji
+  - Naprawa mapowania odpowiedzi `/delegations/:id/calculate` (znikające obliczenia)
+  - Naprawa błędu `Cannot read properties of undefined (reading 'fullDays')`
+  - Poprawki PDF: polskie znaki, godziny wyjazdu/powrotu, korekta tekstu `45,00 zł / doba`
+  - Wczytywanie istniejących danych firmy do formularza administracyjnego
+  - Prawidłowa edycja delegacji na istniejącym rekordzie (`/delegations/:id/edit`)
+  - Poprawne symbole walut dla delegacji zagranicznych (np. `AUD` zamiast `zł`)
+  - Rozdzielenie krajowych i zagranicznych limitów/ryczałtów noclegowych w UI
+
+### [1.0.0] - 2026-03-03
 - Faza 2: Delegacje zagraniczne
   - Dwuodcinkowy model obliczania (odcinek krajowy + zagraniczny)
-  - 48 krajów z oficjalnymi stawkami diet i limitami noclegów
+  - 115 krajów z oficjalnymi stawkami diet i limitami noclegów
   - Progi godzinowe zagraniczne: ≤8h = 1/3, 8-12h = 1/2, >12h = 100%
   - Pomniejszenia za posiłki zagraniczne: 15% / 30% / 30%
   - CRUD stawek zagranicznych w panelu admina

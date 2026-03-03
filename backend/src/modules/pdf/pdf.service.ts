@@ -608,7 +608,7 @@ function renderDietTable(
       y
     );
   } else {
-    doc.text(`Stawka diety: ${formatPLN(45)} / dobe`, MARGIN, y);
+    doc.text(`Stawka diety: ${formatPLN(45)} / doba`, MARGIN, y);
   }
   y += 16;
 
