@@ -20,7 +20,7 @@ import { StepMeals } from './StepMeals';
 import { StepAdditionalCosts } from './StepAdditionalCosts';
 import { StepAdvance } from './StepAdvance';
 import { StepSummary } from './StepSummary';
-import type { CalculationResult } from '../../../../shared/types';
+import type { ApiCalculationResult } from '@/utils/calculation';
 
 // ---------- Zod schema ----------
 
@@ -164,7 +164,7 @@ export function DelegationWizard({
 }: DelegationWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [calculationResult, setCalculationResult] =
-    useState<CalculationResult | null>(null);
+    useState<ApiCalculationResult | null>(null);
 
   const methods = useForm<DelegationFormValues>({
     resolver: zodResolver(delegationFormSchema),

@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import type { Decimal } from '@prisma/client/runtime/library';
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
+import { existsSync } from 'node:fs';
 import { amountToWords } from './number-to-words.js';
 
 // =====================
@@ -222,8 +223,14 @@ const PAGE_HEIGHT = 841.89;
 const MARGIN = 56.69; // ~20mm in points
 const CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN;
 
-const FONT_NORMAL = 'Helvetica';
-const FONT_BOLD = 'Helvetica-Bold';
+const FONT_NORMAL = [
+  '/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf',
+  '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+].find((p) => existsSync(p)) ?? 'Helvetica';
+const FONT_BOLD = [
+  '/usr/share/fonts/ttf-dejavu/DejaVuSans-Bold.ttf',
+  '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+].find((p) => existsSync(p)) ?? 'Helvetica-Bold';
 
 const FONT_SIZE_TITLE = 13;
 const FONT_SIZE_SUBTITLE = 10;
@@ -423,8 +430,10 @@ function renderBasicInfo(
   const rows: [string, string][] = [
     ['Cel podrozy:', delegation.purpose],
     ['Miejsce:', delegation.destination],
-    ['Data wyjazdu:', formatDateTime(delegation.departureAt)],
-    ['Data powrotu:', formatDateTime(delegation.returnAt)],
+    ['Data i godzina wyjazdu:', formatDateTime(delegation.departureAt)],
+    ['Data i godzina powrotu:', formatDateTime(delegation.returnAt)],
+    ['Godzina wyjazdu:', format(delegation.departureAt, 'HH:mm')],
+    ['Godzina powrotu:', format(delegation.returnAt, 'HH:mm')],
     ['Czas trwania:', formatDuration(delegation.departureAt, delegation.returnAt)],
     ['Srodek transportu:', transportTypeLabel(delegation.transportType)],
   ];

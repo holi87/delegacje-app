@@ -37,7 +37,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import type { CalculationResult } from '../../../shared/types';
+import {
+  normalizeCalculationResult,
+  type ApiCalculationResult,
+} from '@/utils/calculation';
 
 // ---------- Labels ----------
 
@@ -96,7 +99,7 @@ export default function DelegationDetailPage() {
   const {
     data: calculationData,
     isLoading: isCalcLoading,
-  } = useQuery<CalculationResult>({
+  } = useQuery<ApiCalculationResult>({
     queryKey: ['delegation-calculation', id],
     queryFn: () => calculateDelegation(id!),
     enabled: !!id && !!delegationData,
@@ -214,7 +217,7 @@ export default function DelegationDetailPage() {
 
   const delegation = delegationData.delegation ?? delegationData;
   const status = delegation.status as string;
-  const calc = calculationData as CalculationResult | undefined;
+  const calc = normalizeCalculationResult(calculationData as ApiCalculationResult | undefined);
 
   const isMutating =
     submitMut.isPending ||
@@ -449,7 +452,11 @@ export default function DelegationDetailPage() {
             </CardHeader>
             <CardContent>
               <p className="mb-3 text-xs text-muted-foreground">
-                Stawka: {formatCurrency(calc.diet.rateUsed)} | Czas:{' '}
+                Stawka:{' '}
+                {calc.diet.rateUsed != null
+                  ? formatCurrency(calc.diet.rateUsed)
+                  : 'wg stawki krajowej i zagranicznej'}{' '}
+                | Czas:{' '}
                 {calc.duration.fullDays} dob, {Math.round(calc.duration.remainingHours)}h
               </p>
               <Table>

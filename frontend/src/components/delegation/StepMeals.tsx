@@ -27,6 +27,22 @@ interface DelegationDay {
   dateLabel: string;
 }
 
+function isForeignSegmentInDay(
+  dayStart: Date,
+  dayEnd: Date,
+  borderCrossingOut: string,
+  borderCrossingIn: string
+): boolean {
+  const borderOut = new Date(borderCrossingOut);
+  const borderIn = new Date(borderCrossingIn);
+  if (isNaN(borderOut.getTime()) || isNaN(borderIn.getTime()) || borderIn <= borderOut) {
+    return false;
+  }
+
+  // Any overlap between [dayStart, dayEnd) and [borderOut, borderIn)
+  return dayEnd > borderOut && dayStart < borderIn;
+}
+
 function calculateDelegationDays(
   departureAt: string,
   returnAt: string
@@ -93,6 +109,8 @@ export function StepMeals() {
 
   const departureAt = watch('departureAt');
   const returnAt = watch('returnAt');
+  const borderCrossingOut = watch('borderCrossingOut');
+  const borderCrossingIn = watch('borderCrossingIn');
   const days = watch('days');
   const delegationType = watch('type');
 
@@ -110,6 +128,12 @@ export function StepMeals() {
     // Build a new days array preserving existing meal/accommodation data
     const newDays = delegationDays.map((dd, idx) => {
       const existing = currentDays[idx];
+      const autoForeign =
+        delegationType === 'FOREIGN' &&
+        !!borderCrossingOut &&
+        !!borderCrossingIn &&
+        isForeignSegmentInDay(dd.startDate, dd.endDate, borderCrossingOut, borderCrossingIn);
+
       return {
         dayNumber: dd.dayNumber,
         date: dd.startDate.toISOString().slice(0, 10),
@@ -118,7 +142,7 @@ export function StepMeals() {
         dinnerProvided: existing?.dinnerProvided ?? false,
         accommodationType: existing?.accommodationType ?? 'NONE' as const,
         accommodationCost: existing?.accommodationCost ?? null,
-        isForeign: existing?.isForeign ?? false,
+        isForeign: delegationType === 'FOREIGN' ? autoForeign : false,
       };
     });
 
@@ -128,12 +152,20 @@ export function StepMeals() {
       newDays.some(
         (d, i) =>
           d.dayNumber !== currentDays[i]?.dayNumber ||
-          d.date !== currentDays[i]?.date
+          d.date !== currentDays[i]?.date ||
+          d.isForeign !== currentDays[i]?.isForeign
       )
     ) {
       setValue('days', newDays);
     }
-  }, [delegationDays.length, departureAt, returnAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    delegationDays.length,
+    departureAt,
+    returnAt,
+    delegationType,
+    borderCrossingOut,
+    borderCrossingIn,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleMeal = (
     dayIndex: number,

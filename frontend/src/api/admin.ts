@@ -54,12 +54,12 @@ export async function deleteForeignRate(id: string) {
 // Company
 export async function getCompanyInfo() {
   const response = await apiClient.get('/admin/company');
-  return response.data;
+  return response.data?.companyInfo ?? response.data;
 }
 
 export async function updateCompanyInfo(data: any) {
   const response = await apiClient.patch('/admin/company', data);
-  return response.data;
+  return response.data?.companyInfo ?? response.data;
 }
 
 // Users

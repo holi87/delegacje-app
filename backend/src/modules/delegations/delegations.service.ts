@@ -762,25 +762,50 @@ function buildCalculationInput(delegation: any): CalculationInput {
 // =====================
 
 function buildForeignCalculationInput(delegation: any): ForeignDelegationInput {
+  const borderCrossingOut =
+    delegation.borderCrossingOut?.toISOString() ?? delegation.departureAt.toISOString();
+  const borderCrossingIn =
+    delegation.borderCrossingIn?.toISOString() ?? delegation.returnAt.toISOString();
+
+  const borderOutDate = new Date(borderCrossingOut);
+  const borderInDate = new Date(borderCrossingIn);
+
+  const mappedDays = delegation.days.map((d: any) => ({
+    dayNumber: d.dayNumber,
+    date: d.date.toISOString().split('T')[0],
+    isForeign: d.isForeign ?? false,
+    breakfastProvided: d.breakfastProvided,
+    lunchProvided: d.lunchProvided,
+    dinnerProvided: d.dinnerProvided,
+    accommodationType: d.accommodationType,
+    accommodationCost: d.accommodationCost ? Number(d.accommodationCost.toString()) : null,
+  }));
+
+  // Backward compatibility: infer foreign segment when old drafts have no isForeign flags.
+  if (
+    mappedDays.length > 0 &&
+    !mappedDays.some((d: any) => d.isForeign) &&
+    !isNaN(borderOutDate.getTime()) &&
+    !isNaN(borderInDate.getTime()) &&
+    borderInDate > borderOutDate
+  ) {
+    for (const day of mappedDays) {
+      const dayStart = new Date(`${day.date}T00:00:00`);
+      const dayEnd = new Date(`${day.date}T23:59:59.999`);
+      day.isForeign = dayEnd > borderOutDate && dayStart < borderInDate;
+    }
+  }
+
   return {
     departureAt: delegation.departureAt.toISOString(),
     returnAt: delegation.returnAt.toISOString(),
-    borderCrossingOut: delegation.borderCrossingOut?.toISOString() ?? delegation.departureAt.toISOString(),
-    borderCrossingIn: delegation.borderCrossingIn?.toISOString() ?? delegation.returnAt.toISOString(),
+    borderCrossingOut,
+    borderCrossingIn,
     foreignCountry: delegation.foreignCountry ?? '',
     transportType: delegation.transportType,
     vehicleType: delegation.vehicleType,
     advanceAmount: Number(delegation.advanceAmount?.toString() ?? '0'),
-    days: delegation.days.map((d: any) => ({
-      dayNumber: d.dayNumber,
-      date: d.date.toISOString().split('T')[0],
-      isForeign: d.isForeign ?? false,
-      breakfastProvided: d.breakfastProvided,
-      lunchProvided: d.lunchProvided,
-      dinnerProvided: d.dinnerProvided,
-      accommodationType: d.accommodationType,
-      accommodationCost: d.accommodationCost ? Number(d.accommodationCost.toString()) : null,
-    })),
+    days: mappedDays,
     mileageDetails: delegation.mileageDetails
       ? {
           vehicleType: delegation.mileageDetails.vehicleType,

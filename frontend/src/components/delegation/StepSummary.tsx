@@ -15,9 +15,33 @@ import { Loader2, AlertCircle, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { createDelegation, calculateDelegation } from '@/api/delegations';
+import {
+  normalizeCalculationResult,
+  type ApiCalculationResult,
+} from '@/utils/calculation';
 import { toast } from 'sonner';
 import type { DelegationFormValues } from './DelegationWizard';
-import type { CalculationResult } from '../../../../shared/types';
+
+function parseDecimal(value: string | number, fieldName: string): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  const normalized = String(value).trim().replace(',', '.');
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Nieprawidlowa wartosc pola: ${fieldName}`);
+  }
+  return parsed;
+}
+
+function parseOptionalDecimal(
+  value: string | number | null | undefined,
+  fieldName: string
+): number | null {
+  if (value == null || value === '') return null;
+  return parseDecimal(value, fieldName);
+}
 
 const TRANSPORT_LABELS: Record<string, string> = {
   COMPANY_VEHICLE: 'Pojazd sluzbowy',
@@ -35,8 +59,8 @@ const ACCOMMODATION_LABELS: Record<string, string> = {
 
 interface StepSummaryProps {
   delegationId?: string;
-  calculationResult: CalculationResult | null;
-  onCalculationResult: (result: CalculationResult | null) => void;
+  calculationResult: ApiCalculationResult | null;
+  onCalculationResult: (result: ApiCalculationResult | null) => void;
 }
 
 export function StepSummary({
@@ -122,8 +146,10 @@ export function StepSummary({
     );
   }
 
+  const calc = normalizeCalculationResult(calculationResult);
+
   // No result yet
-  if (!calculationResult) {
+  if (!calc) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Calculator className="h-8 w-8 text-muted-foreground" />
@@ -141,8 +167,6 @@ export function StepSummary({
       </div>
     );
   }
-
-  const calc = calculationResult;
 
   return (
     <div className="space-y-6">
@@ -200,7 +224,10 @@ export function StepSummary({
       <div className="space-y-3">
         <h3 className="font-semibold">Diety</h3>
         <p className="text-xs text-muted-foreground">
-          Stawka diety: {formatCurrency(calc.diet.rateUsed)}
+          Stawka diety:{' '}
+          {calc.diet.rateUsed != null
+            ? formatCurrency(calc.diet.rateUsed)
+            : 'wg stawki krajowej i zagranicznej'}
         </p>
         <div className="overflow-x-auto">
           <Table>
@@ -473,15 +500,22 @@ export function StepSummary({
 
 function buildApiPayload(data: DelegationFormValues) {
   return {
-    type: 'DOMESTIC' as const,
+    type: data.type ?? 'DOMESTIC',
     purpose: data.purpose,
     destination: data.destination,
     departureAt: new Date(data.departureAt).toISOString(),
     returnAt: new Date(data.returnAt).toISOString(),
+    foreignCountry: data.foreignCountry ?? null,
+    borderCrossingOut: data.borderCrossingOut
+      ? new Date(data.borderCrossingOut).toISOString()
+      : null,
+    borderCrossingIn: data.borderCrossingIn
+      ? new Date(data.borderCrossingIn).toISOString()
+      : null,
     transportType: data.transportType,
     vehicleType: data.mileageDetails?.vehicleType ?? null,
     accommodationType: data.accommodationType,
-    advanceAmount: data.advanceAmount || '0',
+    advanceAmount: parseDecimal(data.advanceAmount || '0', 'advanceAmount'),
     days: data.days.map((d) => ({
       dayNumber: d.dayNumber,
       date: d.date,
@@ -489,7 +523,11 @@ function buildApiPayload(data: DelegationFormValues) {
       lunchProvided: d.lunchProvided,
       dinnerProvided: d.dinnerProvided,
       accommodationType: d.accommodationType,
-      accommodationCost: d.accommodationCost || null,
+      accommodationCost: parseOptionalDecimal(
+        d.accommodationCost,
+        `days[${d.dayNumber}].accommodationCost`
+      ),
+      isForeign: d.isForeign ?? false,
     })),
     mileageDetails: data.mileageDetails
       ? {
@@ -500,13 +538,13 @@ function buildApiPayload(data: DelegationFormValues) {
       : null,
     transportReceipts: data.transportReceipts.map((r) => ({
       description: r.description,
-      amount: r.amount,
+      amount: parseDecimal(r.amount, 'transportReceipts.amount'),
       receiptNumber: r.receiptNumber || null,
     })),
     additionalCosts: data.additionalCosts.map((c) => ({
       description: c.description,
       category: c.category,
-      amount: c.amount,
+      amount: parseDecimal(c.amount, 'additionalCosts.amount'),
       receiptNumber: c.receiptNumber || null,
     })),
   };

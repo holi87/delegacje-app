@@ -12,6 +12,27 @@ import {
   submitDelegation,
 } from '@/api/delegations';
 
+function parseDecimal(value: string | number, fieldName: string): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  const normalized = String(value).trim().replace(',', '.');
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Nieprawidlowa wartosc pola: ${fieldName}`);
+  }
+  return parsed;
+}
+
+function parseOptionalDecimal(
+  value: string | number | null | undefined,
+  fieldName: string
+): number | null {
+  if (value == null || value === '') return null;
+  return parseDecimal(value, fieldName);
+}
+
 function buildApiPayload(data: DelegationFormValues) {
   return {
     type: data.type ?? 'DOMESTIC',
@@ -25,7 +46,7 @@ function buildApiPayload(data: DelegationFormValues) {
     transportType: data.transportType,
     vehicleType: data.mileageDetails?.vehicleType ?? null,
     accommodationType: data.accommodationType,
-    advanceAmount: data.advanceAmount || '0',
+    advanceAmount: parseDecimal(data.advanceAmount || '0', 'advanceAmount'),
     days: data.days.map((d) => ({
       dayNumber: d.dayNumber,
       date: d.date,
@@ -33,7 +54,10 @@ function buildApiPayload(data: DelegationFormValues) {
       lunchProvided: d.lunchProvided,
       dinnerProvided: d.dinnerProvided,
       accommodationType: d.accommodationType,
-      accommodationCost: d.accommodationCost || null,
+      accommodationCost: parseOptionalDecimal(
+        d.accommodationCost,
+        `days[${d.dayNumber}].accommodationCost`
+      ),
       isForeign: d.isForeign ?? false,
     })),
     mileageDetails: data.mileageDetails
@@ -45,13 +69,13 @@ function buildApiPayload(data: DelegationFormValues) {
       : null,
     transportReceipts: data.transportReceipts.map((r) => ({
       description: r.description,
-      amount: r.amount,
+      amount: parseDecimal(r.amount, 'transportReceipts.amount'),
       receiptNumber: r.receiptNumber || null,
     })),
     additionalCosts: data.additionalCosts.map((c) => ({
       description: c.description,
       category: c.category,
-      amount: c.amount,
+      amount: parseDecimal(c.amount, 'additionalCosts.amount'),
       receiptNumber: c.receiptNumber || null,
     })),
   };
