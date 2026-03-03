@@ -1,0 +1,39 @@
+{
+  "name": "delegacje-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cli:reset-password": "tsx src/cli/reset-password.ts",
+    "cli:list-admins": "tsx src/cli/reset-password.ts --list-admins"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "bcrypt": "^5.1.1",
+    "fastify": "^5.2.1",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.0.1",
+    "@fastify/jwt": "^9.0.2",
+    "fastify-plugin": "^5.0.1",
+    "zod": "^3.24.2",
+    "pdfkit": "^0.16.0",
+    "date-fns": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^22.13.5",
+    "@types/pdfkit": "^0.13.9",
+    "prisma": "^6.4.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
