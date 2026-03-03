@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -9,10 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { getForeignRates } from '@/api/admin';
 import { formatCurrency } from '@/utils/formatters';
 import { BedDouble, AlertTriangle } from 'lucide-react';
 import type { DelegationFormValues } from './DelegationWizard';
 import type { AccommodationType } from '../../../../shared/types';
+import type { ForeignDietRate } from '../../../../shared/types';
 
 const ACCOMMODATION_TYPES = [
   { value: 'RECEIPT', label: 'Wg rachunku' },
@@ -21,8 +24,44 @@ const ACCOMMODATION_TYPES = [
   { value: 'NONE', label: 'Brak' },
 ] as const;
 
-const LUMP_SUM_AMOUNT = 67.5; // 150% of 45 zl diet
-const MAX_RECEIPT_AMOUNT = 900; // 20x diet
+const DOMESTIC_LUMP_SUM_AMOUNT = 67.5; // 150% of 45 zl diet
+const DOMESTIC_MAX_RECEIPT_AMOUNT = 900; // 20x diet
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function parseAmount(value: string | number | null | undefined): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatAmountByCurrency(amount: number, currency: string): string {
+  if (currency === 'PLN') return formatCurrency(amount);
+  return `${amount.toLocaleString('pl-PL', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${currency}`;
+}
+
+function isForeignNight(
+  nightDate: string,
+  borderCrossingOut: string,
+  borderCrossingIn: string
+): boolean {
+  const borderOut = new Date(borderCrossingOut);
+  const borderIn = new Date(borderCrossingIn);
+  if (isNaN(borderOut.getTime()) || isNaN(borderIn.getTime()) || borderIn <= borderOut) {
+    return false;
+  }
+
+  const nightStart = new Date(`${nightDate}T00:00:00`);
+  const nightEnd = new Date(nightStart);
+  nightEnd.setDate(nightEnd.getDate() + 1);
+
+  return nightEnd > borderOut && nightStart < borderIn;
+}
 
 /**
  * Calculate nights from departure/return based on delegation days (doba delegacyjna).
@@ -85,11 +124,70 @@ export function StepAccommodation() {
   const returnAt = watch('returnAt');
   const accommodationType = watch('accommodationType');
   const days = watch('days');
+  const delegationType = watch('type');
+  const foreignCountry = watch('foreignCountry');
+  const borderCrossingOut = watch('borderCrossingOut');
+  const borderCrossingIn = watch('borderCrossingIn');
+
+  const { data: foreignRatesData } = useQuery({
+    queryKey: ['admin', 'rates', 'foreign'],
+    queryFn: getForeignRates,
+    enabled: delegationType === 'FOREIGN',
+  });
+
+  const foreignRates: ForeignDietRate[] = foreignRatesData?.rates ?? foreignRatesData ?? [];
+  const selectedForeignRate = useMemo(
+    () => foreignRates.find((r) => r.countryCode === foreignCountry) ?? null,
+    [foreignRates, foreignCountry]
+  );
+  const foreignAccommodationLimit = selectedForeignRate
+    ? parseAmount(selectedForeignRate.accommodationLimit)
+    : null;
 
   const nights = useMemo(
     () => calculateNights(departureAt, returnAt),
     [departureAt, returnAt]
   );
+
+  const nightsMeta = useMemo(() => {
+    return nights.map((nightDate, idx) => {
+      const dayIsForeign = days?.[idx]?.isForeign;
+      const inferredForeign =
+        delegationType === 'FOREIGN' &&
+        !!borderCrossingOut &&
+        !!borderCrossingIn &&
+        isForeignNight(nightDate, borderCrossingOut, borderCrossingIn);
+
+      const isForeign = delegationType === 'FOREIGN' && (dayIsForeign ?? inferredForeign);
+      const receiptLimit =
+        isForeign && foreignAccommodationLimit != null
+          ? foreignAccommodationLimit
+          : DOMESTIC_MAX_RECEIPT_AMOUNT;
+      const lumpSumAmount =
+        isForeign && foreignAccommodationLimit != null
+          ? round2(foreignAccommodationLimit * 0.25)
+          : DOMESTIC_LUMP_SUM_AMOUNT;
+      const currency =
+        isForeign && selectedForeignRate?.currency
+          ? selectedForeignRate.currency
+          : 'PLN';
+
+      return {
+        isForeign,
+        receiptLimit,
+        lumpSumAmount,
+        currency,
+      };
+    });
+  }, [
+    nights,
+    days,
+    delegationType,
+    borderCrossingOut,
+    borderCrossingIn,
+    foreignAccommodationLimit,
+    selectedForeignRate?.currency,
+  ]);
 
   // Sync accommodation type to days when global type changes or nights change
   useEffect(() => {
@@ -200,13 +298,21 @@ export function StepAccommodation() {
                       className="w-32"
                       {...register(`days.${idx}.accommodationCost`)}
                     />
-                    <span className="text-xs text-muted-foreground">PLN</span>
+                    <span className="text-xs text-muted-foreground">
+                      {nightsMeta[idx]?.currency ?? 'PLN'}
+                    </span>
                     {days[idx]?.accommodationCost &&
-                      parseFloat(days[idx].accommodationCost || '0') >
-                        MAX_RECEIPT_AMOUNT && (
+                      parseAmount(days[idx].accommodationCost || '0') >
+                        (nightsMeta[idx]?.receiptLimit ?? DOMESTIC_MAX_RECEIPT_AMOUNT) && (
                         <div className="flex items-center gap-1 text-xs text-amber-600">
                           <AlertTriangle className="h-3.5 w-3.5" />
-                          <span>Ponad limit {formatCurrency(MAX_RECEIPT_AMOUNT)}</span>
+                          <span>
+                            Ponad limit{' '}
+                            {formatAmountByCurrency(
+                              nightsMeta[idx]?.receiptLimit ?? DOMESTIC_MAX_RECEIPT_AMOUNT,
+                              nightsMeta[idx]?.currency ?? 'PLN'
+                            )}
+                          </span>
                         </div>
                       )}
                   </div>
@@ -214,7 +320,10 @@ export function StepAccommodation() {
 
                 {accommodationType === 'LUMP_SUM' && (
                   <span className="text-sm font-medium">
-                    {formatCurrency(LUMP_SUM_AMOUNT)}
+                    {formatAmountByCurrency(
+                      nightsMeta[idx]?.lumpSumAmount ?? DOMESTIC_LUMP_SUM_AMOUNT,
+                      nightsMeta[idx]?.currency ?? 'PLN'
+                    )}
                   </span>
                 )}
 
@@ -236,12 +345,27 @@ export function StepAccommodation() {
           {/* Summary for lump sum */}
           {accommodationType === 'LUMP_SUM' && nights.length > 0 && (
             <div className="rounded-lg bg-muted/50 p-3 text-sm">
-              <span className="text-muted-foreground">
-                Ryczalt za noclegi:{' '}
-              </span>
+              <span className="text-muted-foreground">Ryczalt za noclegi: </span>
               <span className="font-semibold">
-                {nights.length} x {formatCurrency(LUMP_SUM_AMOUNT)} ={' '}
-                {formatCurrency(nights.length * LUMP_SUM_AMOUNT)}
+                {nightsMeta.filter((n) => !n.isForeign).length > 0 && (
+                  <span>
+                    krajowy:{' '}
+                    {nightsMeta.filter((n) => !n.isForeign).length} x{' '}
+                    {formatCurrency(DOMESTIC_LUMP_SUM_AMOUNT)}
+                  </span>
+                )}
+                {nightsMeta.some((n) => n.isForeign) &&
+                  foreignAccommodationLimit != null &&
+                  selectedForeignRate?.currency && (
+                    <span className="ml-2">
+                      zagraniczny:{' '}
+                      {nightsMeta.filter((n) => n.isForeign).length} x{' '}
+                      {formatAmountByCurrency(
+                        round2(foreignAccommodationLimit * 0.25),
+                        selectedForeignRate.currency
+                      )}
+                    </span>
+                  )}
               </span>
             </div>
           )}
