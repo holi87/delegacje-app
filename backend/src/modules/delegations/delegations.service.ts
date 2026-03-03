@@ -2,7 +2,6 @@ import { PrismaClient, Prisma, DelegationStatus } from '@prisma/client';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../utils/errors.js';
 import { calculateDelegation, CalculationInput, CalculationResult } from './calculation.service.js';
 import { calculateForeignDelegation, ForeignDelegationInput, ForeignCalculationResult, findForeignRate } from './foreign-calculation.service.js';
-import { fetchNbpRate } from '../nbp/nbp.service.js';
 import type { CreateDelegationInput, UpdateDelegationInput } from './delegations.schema.js';
 
 // =====================
@@ -524,9 +523,6 @@ export async function submitDelegation(
       // Look up foreign rate ID to freeze it
       const foreignRate = await findForeignRate(prisma, foreignInput.foreignCountry, new Date(foreignInput.departureAt));
 
-      // Fetch NBP exchange rate for settlement
-      const nbpRate = await fetchNbpRate(foreignRate.currency, new Date());
-
       // Update delegation totals and status
       return tx.delegation.update({
         where: { id: delegationId },
@@ -542,9 +538,9 @@ export async function submitDelegation(
           totalAdditional: new Prisma.Decimal(foreignResult.summary.additionalTotal),
           grandTotal: new Prisma.Decimal(foreignResult.summary.grandTotal),
           amountDue: new Prisma.Decimal(foreignResult.summary.amountDue),
-          exchangeRate: new Prisma.Decimal(nbpRate.rate),
-          exchangeRateDate: new Date(nbpRate.effectiveDate),
-          exchangeRateTable: nbpRate.tableNo,
+          exchangeRate: new Prisma.Decimal(foreignResult.summary.exchangeRate),
+          exchangeRateDate: new Date(foreignResult.summary.exchangeRateDate),
+          exchangeRateTable: foreignResult.summary.exchangeRateTable,
         },
         include: fullDelegationInclude,
       });

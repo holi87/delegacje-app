@@ -218,12 +218,20 @@ export interface ForeignCalculationResult {
   summary: {
     domesticDietTotal: string;
     foreignDietTotal: string;
+    foreignDietTotalPln?: string;
     dietTotal: string;
+    domesticAccommodationTotal?: string;
+    foreignAccommodationTotal?: string;
+    foreignAccommodationTotalPln?: string;
     accommodationTotal: string;
     transportTotal: string;
     additionalTotal: string;
     grandTotal: string;
     advanceAmount: string;
     amountDue: string;
+    exchangeRate?: string;
+    exchangeRateDate?: string;
+    exchangeRateTable?: string;
+    foreignCurrency?: string;
   };
 }

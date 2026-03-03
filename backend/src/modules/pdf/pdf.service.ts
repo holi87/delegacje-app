@@ -130,6 +130,32 @@ function formatDecimal(amount: number, decimals = 2): string {
   return `${sign}${withSeparator},${decPart}`;
 }
 
+function formatAmountByCurrency(amount: number, currency: string | null | undefined): string {
+  const code = (currency ?? 'PLN').toUpperCase();
+  if (code === 'PLN') {
+    return formatPLN(amount);
+  }
+  return `${formatDecimal(amount)} ${code}`;
+}
+
+function formatMixedCurrency(
+  plnAmount: number,
+  foreignAmount: number,
+  foreignCurrency: string | null | undefined
+): string {
+  const parts: string[] = [];
+  if (Math.abs(plnAmount) > 0.00001) {
+    parts.push(formatPLN(plnAmount));
+  }
+  if (Math.abs(foreignAmount) > 0.00001) {
+    parts.push(formatAmountByCurrency(foreignAmount, foreignCurrency));
+  }
+  if (parts.length === 0) {
+    return '0,00';
+  }
+  return parts.join(' + ');
+}
+
 /** Format date as DD.MM.YYYY */
 function formatDate(date: Date): string {
   return format(date, 'dd.MM.yyyy');
@@ -515,17 +541,29 @@ function renderDietTable(
   const days = delegation.days;
   const rows: TableRow[] = [];
 
-  let totalBase = 0;
-  let totalDeductions = 0;
-  let totalFinal = 0;
+  let totalBasePln = 0;
+  let totalBaseForeign = 0;
+  let totalDeductionsPln = 0;
+  let totalDeductionsForeign = 0;
+  let totalFinalPln = 0;
+  let totalFinalForeign = 0;
+  const foreignCurrency = delegation.foreignCurrency ?? null;
 
   for (const day of days) {
     const base = d2n(day.dietBase);
     const deductions = d2n(day.dietDeductions);
     const final_ = d2n(day.dietFinal);
-    totalBase += base;
-    totalDeductions += deductions;
-    totalFinal += final_;
+    const dayCurrency = isForeign && day.isForeign ? foreignCurrency : 'PLN';
+
+    if (isForeign && day.isForeign) {
+      totalBaseForeign += base;
+      totalDeductionsForeign += deductions;
+      totalFinalForeign += final_;
+    } else {
+      totalBasePln += base;
+      totalDeductionsPln += deductions;
+      totalFinalPln += final_;
+    }
 
     // Build deduction description
     const deductionParts: string[] = [];
@@ -534,7 +572,7 @@ function renderDietTable(
     if (day.dinnerProvided) deductionParts.push('kol.');
 
     const deductionText = deductions > 0
-      ? `-${formatDecimal(deductions)} (${deductionParts.join(', ')})`
+      ? `-${formatAmountByCurrency(deductions, dayCurrency)} (${deductionParts.join(', ')})`
       : '0,00';
 
     if (isForeign) {
@@ -545,9 +583,9 @@ function renderDietTable(
           formatDate(day.date),
           segment,
           formatDecimal(d2n(day.hoursInDay), 1),
-          formatPLN(base),
+          formatAmountByCurrency(base, dayCurrency),
           deductionText,
-          formatPLN(final_),
+          formatAmountByCurrency(final_, dayCurrency),
         ],
       });
     } else {
@@ -566,15 +604,19 @@ function renderDietTable(
 
   // Totals row
   if (isForeign) {
+    const totalDeductionsText =
+      totalDeductionsPln > 0 || totalDeductionsForeign > 0
+        ? `-${formatMixedCurrency(totalDeductionsPln, totalDeductionsForeign, foreignCurrency)}`
+        : '0,00';
     rows.push({
       cells: [
         '',
         '',
         '',
         'RAZEM',
-        formatPLN(totalBase),
-        totalDeductions > 0 ? `-${formatDecimal(totalDeductions)}` : '0,00',
-        formatPLN(totalFinal),
+        formatMixedCurrency(totalBasePln, totalBaseForeign, foreignCurrency),
+        totalDeductionsText,
+        formatMixedCurrency(totalFinalPln, totalFinalForeign, foreignCurrency),
       ],
       bold: true,
       separator: true,
@@ -585,9 +627,9 @@ function renderDietTable(
         '',
         '',
         'RAZEM',
-        formatPLN(totalBase),
-        totalDeductions > 0 ? `-${formatDecimal(totalDeductions)}` : '0,00',
-        formatPLN(totalFinal),
+        formatPLN(totalBasePln),
+        totalDeductionsPln > 0 ? `-${formatDecimal(totalDeductionsPln)}` : '0,00',
+        formatPLN(totalFinalPln),
       ],
       bold: true,
       separator: true,
@@ -602,8 +644,13 @@ function renderDietTable(
   if (delegation.type === 'FOREIGN') {
     const domesticDietTotal = d2n(delegation.totalDomesticDiet);
     const foreignDietTotal = d2n(delegation.totalForeignDiet);
+    const exchangeRate = d2n(delegation.exchangeRate);
+    const conversionText =
+      exchangeRate > 0
+        ? ` | Po kursie NBP: ${formatPLN(foreignDietTotal * exchangeRate)}`
+        : '';
     doc.text(
-      `Dieta krajowa: ${formatPLN(domesticDietTotal)} | Dieta zagraniczna: ${formatPLN(foreignDietTotal)} (${delegation.foreignCurrency ?? ''})`,
+      `Dieta krajowa: ${formatPLN(domesticDietTotal)} | Dieta zagraniczna: ${formatAmountByCurrency(foreignDietTotal, foreignCurrency)}${conversionText}`,
       MARGIN,
       y
     );
@@ -647,18 +694,27 @@ function renderAccommodationTable(
   ];
 
   const rows: TableRow[] = [];
-  let total = 0;
+  const isForeignDelegation = delegation.type === 'FOREIGN';
+  const foreignCurrency = delegation.foreignCurrency ?? null;
+  let domesticTotal = 0;
+  let foreignTotal = 0;
   let idx = 1;
 
   for (const night of nights) {
     const cost = d2n(night.accommodationCost);
-    total += cost;
+    const nightCurrency =
+      isForeignDelegation && night.isForeign ? foreignCurrency : 'PLN';
+    if (isForeignDelegation && night.isForeign) {
+      foreignTotal += cost;
+    } else {
+      domesticTotal += cost;
+    }
     rows.push({
       cells: [
         idx.toString(),
         formatDate(night.date),
         accommodationTypeLabel(night.accommodationType),
-        formatPLN(cost),
+        formatAmountByCurrency(cost, nightCurrency),
       ],
     });
     idx++;
@@ -666,12 +722,29 @@ function renderAccommodationTable(
 
   // Totals row
   rows.push({
-    cells: ['', '', 'RAZEM', formatPLN(total)],
+    cells: [
+      '',
+      '',
+      'RAZEM',
+      isForeignDelegation
+        ? formatMixedCurrency(domesticTotal, foreignTotal, foreignCurrency)
+        : formatPLN(domesticTotal),
+    ],
     bold: true,
     separator: true,
   });
 
   y = drawTable(doc, MARGIN, y, columns, rows);
+  if (isForeignDelegation && foreignTotal > 0 && d2n(delegation.exchangeRate) > 0) {
+    const rate = d2n(delegation.exchangeRate);
+    doc.font(FONT_NORMAL).fontSize(FONT_SIZE_SMALL).fillColor(COLOR_GRAY);
+    doc.text(
+      `W tym noclegi zagraniczne w PLN: ${formatPLN(foreignTotal * rate)} (kurs: ${rate.toFixed(4)})`,
+      MARGIN,
+      y + 2
+    );
+    y += 12;
+  }
   y += 16;
 
   return y;
@@ -871,11 +944,16 @@ function renderSummary(
   const foreignDietTotal = d2n(delegation.totalForeignDiet);
 
   const exchangeRate = d2n(delegation.exchangeRate);
+  const foreignCurrency = delegation.foreignCurrency ?? null;
+
+  const foreignAccommodationNominal = delegation.days
+    .filter((d) => d.isForeign && d.accommodationType !== 'NONE')
+    .reduce((sum, d) => sum + d2n(d.accommodationCost), 0);
 
   const summaryLines: [string, string, boolean][] = isForeign
     ? [
         ['Diety (odcinek krajowy):', formatPLN(domesticDietTotal), false],
-        [`Diety (odcinek zagraniczny, ${delegation.foreignCurrency ?? ''}):`, formatPLN(foreignDietTotal), false],
+        [`Diety (odcinek zagraniczny, ${foreignCurrency ?? ''}):`, formatAmountByCurrency(foreignDietTotal, foreignCurrency), false],
         ...(delegation.exchangeRate
           ? [[`w tym dieta zagraniczna w PLN:`, `${formatPLN(foreignDietTotal * exchangeRate)} (kurs: ${exchangeRate.toFixed(4)})`, false] as [string, string, boolean]]
           : []),
@@ -886,6 +964,13 @@ function renderSummary(
       ];
 
   summaryLines.push(
+    ...(isForeign && delegation.exchangeRate && foreignAccommodationNominal > 0
+      ? [[
+          `w tym noclegi zagraniczne w PLN:`,
+          `${formatPLN(foreignAccommodationNominal * exchangeRate)} (kurs: ${exchangeRate.toFixed(4)})`,
+          false,
+        ] as [string, string, boolean]]
+      : []),
     ['Noclegi:', formatPLN(accommodationTotal), false],
     ['Transport:', formatPLN(transportTotal), false],
     ['Koszty dodatkowe:', formatPLN(additionalTotal), false],

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import type { Decimal } from '@prisma/client/runtime/library';
+import { fetchNbpRate } from '../nbp/nbp.service.js';
 
 // =====================
 // Types
@@ -119,15 +120,23 @@ interface AdditionalCostsResult {
 }
 
 interface ForeignSummaryResult {
-  domesticDietTotal: number;
-  foreignDietTotal: number;
-  dietTotal: number;
-  accommodationTotal: number;
+  domesticDietTotal: number; // PLN
+  foreignDietTotal: number; // foreign currency
+  foreignDietTotalPln: number; // PLN
+  dietTotal: number; // PLN
+  domesticAccommodationTotal: number; // PLN
+  foreignAccommodationTotal: number; // foreign currency
+  foreignAccommodationTotalPln: number; // PLN
+  accommodationTotal: number; // PLN
   transportTotal: number;
   additionalTotal: number;
-  grandTotal: number;
+  grandTotal: number; // PLN
   advanceAmount: number;
-  amountDue: number;
+  amountDue: number; // PLN
+  exchangeRate: number;
+  exchangeRateDate: string;
+  exchangeRateTable: string;
+  foreignCurrency: string;
 }
 
 export interface ForeignCalculationResult {
@@ -800,7 +809,6 @@ export async function calculateForeignDelegation(
   const foreignDietTotal = round2(
     foreignDietDays.reduce((sum, d) => sum + d.finalAmount, 0)
   );
-  const dietTotal = round2(domesticDietTotal + foreignDietTotal);
 
   // 5. Calculate accommodation (handles both domestic and foreign nights)
   const accommodationResult = calculateForeignAccommodation(
@@ -815,10 +823,33 @@ export async function calculateForeignDelegation(
   // 7. Calculate additional costs
   const additionalCostsResult = calculateAdditionalCosts(input.additionalCosts);
 
-  // 8. Summary
+  // 8. Currency conversion (foreign parts -> PLN)
+  const nbpRate = await fetchNbpRate(foreignRate.currency, new Date());
+
+  const foreignDietTotalPln = round2(foreignDietTotal * nbpRate.rate);
+  const dietTotal = round2(domesticDietTotal + foreignDietTotalPln);
+
+  const domesticAccommodationTotal = round2(
+    accommodationResult.nights
+      .filter((night) => !night.isForeign)
+      .reduce((sum, night) => sum + night.amount, 0)
+  );
+  const foreignAccommodationTotal = round2(
+    accommodationResult.nights
+      .filter((night) => night.isForeign)
+      .reduce((sum, night) => sum + night.amount, 0)
+  );
+  const foreignAccommodationTotalPln = round2(
+    foreignAccommodationTotal * nbpRate.rate
+  );
+  const accommodationTotal = round2(
+    domesticAccommodationTotal + foreignAccommodationTotalPln
+  );
+
+  // 9. Summary (all totals in PLN)
   const grandTotal = round2(
     dietTotal +
-      accommodationResult.total +
+      accommodationTotal +
       transportResult.total +
       additionalCostsResult.total
   );
@@ -830,13 +861,21 @@ export async function calculateForeignDelegation(
   const summary: ForeignSummaryResult = {
     domesticDietTotal,
     foreignDietTotal,
+    foreignDietTotalPln,
     dietTotal,
-    accommodationTotal: accommodationResult.total,
+    domesticAccommodationTotal,
+    foreignAccommodationTotal,
+    foreignAccommodationTotalPln,
+    accommodationTotal,
     transportTotal: transportResult.total,
     additionalTotal: additionalCostsResult.total,
     grandTotal,
     advanceAmount,
     amountDue,
+    exchangeRate: nbpRate.rate,
+    exchangeRateDate: nbpRate.effectiveDate,
+    exchangeRateTable: nbpRate.tableNo,
+    foreignCurrency: foreignRate.currency,
   };
 
   return {

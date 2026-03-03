@@ -150,15 +150,21 @@ export function StepAccommodation() {
   );
 
   const nightsMeta = useMemo(() => {
+    const hasBorderData =
+      delegationType === 'FOREIGN' &&
+      !!borderCrossingOut &&
+      !!borderCrossingIn;
+
     return nights.map((nightDate, idx) => {
       const dayIsForeign = days?.[idx]?.isForeign;
-      const inferredForeign =
-        delegationType === 'FOREIGN' &&
-        !!borderCrossingOut &&
-        !!borderCrossingIn &&
+      const inferredForeign = hasBorderData &&
         isForeignNight(nightDate, borderCrossingOut, borderCrossingIn);
 
-      const isForeign = delegationType === 'FOREIGN' && (dayIsForeign ?? inferredForeign);
+      // For accommodation currency/limits prefer border-crossing based inference.
+      // This avoids stale `days[].isForeign` values on earlier wizard steps.
+      const isForeign = delegationType === 'FOREIGN' && (
+        hasBorderData ? inferredForeign : !!dayIsForeign
+      );
       const receiptLimit =
         isForeign && foreignAccommodationLimit != null
           ? foreignAccommodationLimit
