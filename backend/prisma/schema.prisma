@@ -118,6 +118,10 @@ model Delegation {
   totalDomesticDiet   Decimal?  @db.Decimal(10, 2) @map("total_domestic_diet")   // dieta za odcinek krajowy
   totalForeignDiet    Decimal?  @db.Decimal(10, 2) @map("total_foreign_diet")    // dieta za odcinek zagraniczny
 
+  exchangeRate        Decimal?  @db.Decimal(10, 4) @map("exchange_rate")       // kurs NBP
+  exchangeRateDate    DateTime? @db.Date @map("exchange_rate_date")             // data kursu
+  exchangeRateTable   String?   @map("exchange_rate_table")                     // nr tabeli NBP
+
   settledAt DateTime? @map("settled_at")
   settledBy String?   @map("settled_by")
   createdAt DateTime  @default(now()) @map("created_at")

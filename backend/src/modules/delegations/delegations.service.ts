@@ -2,6 +2,7 @@ import { PrismaClient, Prisma, DelegationStatus } from '@prisma/client';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../utils/errors.js';
 import { calculateDelegation, CalculationInput, CalculationResult } from './calculation.service.js';
 import { calculateForeignDelegation, ForeignDelegationInput, ForeignCalculationResult, findForeignRate } from './foreign-calculation.service.js';
+import { fetchNbpRate } from '../nbp/nbp.service.js';
 import type { CreateDelegationInput, UpdateDelegationInput } from './delegations.schema.js';
 
 // =====================
@@ -70,6 +71,9 @@ function serializeDelegation(delegation: any) {
     borderCrossingIn: delegation.borderCrossingIn?.toISOString() ?? null,
     totalDomesticDiet: decimalToString(delegation.totalDomesticDiet),
     totalForeignDiet: decimalToString(delegation.totalForeignDiet),
+    exchangeRate: decimalToString(delegation.exchangeRate),
+    exchangeRateDate: delegation.exchangeRateDate ? delegation.exchangeRateDate.toISOString().split('T')[0] : null,
+    exchangeRateTable: delegation.exchangeRateTable,
     settledAt: delegation.settledAt?.toISOString() ?? null,
     settledBy: delegation.settledBy,
     createdAt: delegation.createdAt.toISOString(),
@@ -520,6 +524,9 @@ export async function submitDelegation(
       // Look up foreign rate ID to freeze it
       const foreignRate = await findForeignRate(prisma, foreignInput.foreignCountry, new Date(foreignInput.departureAt));
 
+      // Fetch NBP exchange rate for settlement
+      const nbpRate = await fetchNbpRate(foreignRate.currency, new Date());
+
       // Update delegation totals and status
       return tx.delegation.update({
         where: { id: delegationId },
@@ -535,6 +542,9 @@ export async function submitDelegation(
           totalAdditional: new Prisma.Decimal(foreignResult.summary.additionalTotal),
           grandTotal: new Prisma.Decimal(foreignResult.summary.grandTotal),
           amountDue: new Prisma.Decimal(foreignResult.summary.amountDue),
+          exchangeRate: new Prisma.Decimal(nbpRate.rate),
+          exchangeRateDate: new Date(nbpRate.effectiveDate),
+          exchangeRateTable: nbpRate.tableNo,
         },
         include: fullDelegationInclude,
       });

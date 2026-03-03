@@ -79,6 +79,9 @@ interface DelegationData {
   borderCrossingIn: Date | null;
   totalDomesticDiet: Decimal | null;
   totalForeignDiet: Decimal | null;
+  exchangeRate: Decimal | null;
+  exchangeRateDate: Date | null;
+  exchangeRateTable: string | null;
   createdAt: Date;
   user: {
     profile: UserProfileData | null;
@@ -443,6 +446,10 @@ function renderBasicInfo(
     }
     if (delegation.foreignCurrency) {
       rows.push(['Waluta:', delegation.foreignCurrency]);
+    }
+    if (delegation.exchangeRate) {
+      const rate = d2n(delegation.exchangeRate);
+      rows.push(['Kurs NBP:', `${rate.toFixed(4)} PLN (tabela ${delegation.exchangeRateTable ?? '\u2013'}, z dnia ${delegation.exchangeRateDate ? formatDate(delegation.exchangeRateDate) : '\u2013'})`]);
     }
     if (delegation.borderCrossingOut) {
       rows.push(['Przekroczenie granicy (wyjazd):', formatDateTime(delegation.borderCrossingOut)]);
@@ -854,10 +861,15 @@ function renderSummary(
   const domesticDietTotal = d2n(delegation.totalDomesticDiet);
   const foreignDietTotal = d2n(delegation.totalForeignDiet);
 
+  const exchangeRate = d2n(delegation.exchangeRate);
+
   const summaryLines: [string, string, boolean][] = isForeign
     ? [
         ['Diety (odcinek krajowy):', formatPLN(domesticDietTotal), false],
         [`Diety (odcinek zagraniczny, ${delegation.foreignCurrency ?? ''}):`, formatPLN(foreignDietTotal), false],
+        ...(delegation.exchangeRate
+          ? [[`w tym dieta zagraniczna w PLN:`, `${formatPLN(foreignDietTotal * exchangeRate)} (kurs: ${exchangeRate.toFixed(4)})`, false] as [string, string, boolean]]
+          : []),
         ['Diety razem:', formatPLN(dietTotal), false],
       ]
     : [

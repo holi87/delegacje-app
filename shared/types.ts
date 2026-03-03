@@ -123,6 +123,9 @@ export interface DelegationInput {
   foreignCountry?: string | null;
   borderCrossingOut?: string | null;
   borderCrossingIn?: string | null;
+  exchangeRate?: string | null;
+  exchangeRateDate?: string | null;  // YYYY-MM-DD
+  exchangeRateTable?: string | null;
 }
 
 export interface CalculationDayResult {

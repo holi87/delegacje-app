@@ -383,6 +383,51 @@ export default function DelegationDetailPage() {
                 </span>
               </div>
             )}
+            {delegation.type === 'FOREIGN' && (
+              <>
+                <div>
+                  <span className="text-muted-foreground">Typ delegacji: </span>
+                  <span className="font-medium">Zagraniczna</span>
+                </div>
+                {delegation.foreignCountry && (
+                  <div>
+                    <span className="text-muted-foreground">Kraj: </span>
+                    <span className="font-medium">{delegation.foreignCountry}</span>
+                  </div>
+                )}
+                {delegation.foreignCurrency && (
+                  <div>
+                    <span className="text-muted-foreground">Waluta: </span>
+                    <span className="font-medium">{delegation.foreignCurrency}</span>
+                  </div>
+                )}
+                {delegation.borderCrossingOut && (
+                  <div>
+                    <span className="text-muted-foreground">Przekroczenie granicy (wyjazd): </span>
+                    <span className="font-medium">{formatDateTime(delegation.borderCrossingOut)}</span>
+                  </div>
+                )}
+                {delegation.borderCrossingIn && (
+                  <div>
+                    <span className="text-muted-foreground">Przekroczenie granicy (powrot): </span>
+                    <span className="font-medium">{formatDateTime(delegation.borderCrossingIn)}</span>
+                  </div>
+                )}
+                {delegation.exchangeRate && (
+                  <div className="sm:col-span-2">
+                    <span className="text-muted-foreground">Kurs NBP: </span>
+                    <span className="font-medium">
+                      {parseFloat(delegation.exchangeRate).toFixed(4)} PLN
+                      {delegation.exchangeRateTable && delegation.exchangeRateTable !== 'N/A' && (
+                        <span className="text-muted-foreground text-xs ml-1">
+                          (tabela {delegation.exchangeRateTable}, z dnia {delegation.exchangeRateDate})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
