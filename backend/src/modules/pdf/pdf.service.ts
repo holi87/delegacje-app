@@ -1177,7 +1177,9 @@ function renderFooter(
   doc: InstanceType<typeof PDFDocument>,
   _y: number
 ): void {
-  const footerY = PAGE_HEIGHT - MARGIN - 24;
+  // Keep footer above the bottom margin so PDFKit does not push the last line
+  // to an automatic new page.
+  const footerY = PAGE_HEIGHT - MARGIN - 42;
 
   doc.font(FONT_NORMAL).fontSize(FONT_SIZE_SMALL).fillColor(COLOR_GRAY);
 
