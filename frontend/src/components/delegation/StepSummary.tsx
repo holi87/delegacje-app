@@ -53,6 +53,34 @@ function toNumber(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatHoursOrMinutes(hours: number): string {
+  const safeHours = Number.isFinite(hours) ? Math.max(0, hours) : 0;
+  if (safeHours > 0 && safeHours < 1) {
+    return `${Math.round(safeHours * 60)} min`;
+  }
+  const rounded = Math.round(safeHours * 10) / 10;
+  const decimals = Number.isInteger(rounded) ? 0 : 1;
+  return `${rounded.toLocaleString('pl-PL', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })} h`;
+}
+
+function formatDurationSummary(fullDays: number, remainingHours: number): string {
+  const parts: string[] = [];
+
+  if (fullDays > 0) {
+    const dayLabel = fullDays === 1 ? 'doba' : fullDays < 5 ? 'doby' : 'dob';
+    parts.push(`${fullDays} ${dayLabel}`);
+  }
+
+  if (remainingHours > 0) {
+    parts.push(formatHoursOrMinutes(remainingHours));
+  }
+
+  return parts.length > 0 ? parts.join(', ') : '0 min';
+}
+
 const TRANSPORT_LABELS: Record<string, string> = {
   COMPANY_VEHICLE: 'Pojazd sluzbowy',
   PUBLIC_TRANSPORT: 'Transport publiczny',
@@ -241,7 +269,10 @@ export function StepSummary({
         <div>
           <span className="text-muted-foreground">Czas trwania: </span>
           <span className="font-medium">
-            {calc.duration.fullDays} dob, {Math.round(calc.duration.remainingHours)}h
+            {formatDurationSummary(
+              toNumber(calc.duration.fullDays),
+              toNumber(calc.duration.remainingHours)
+            )}
           </span>
         </div>
         <div>
@@ -271,7 +302,7 @@ export function StepSummary({
             <TableHeader>
               <TableRow>
                 <TableHead>Doba</TableHead>
-                <TableHead className="text-right">Godziny</TableHead>
+                <TableHead className="text-right">Czas</TableHead>
                 <TableHead className="text-right">Podstawa</TableHead>
                 <TableHead className="text-right">Pomniejszenie</TableHead>
                 <TableHead className="text-right">Dieta</TableHead>
@@ -284,7 +315,7 @@ export function StepSummary({
                     <TableRow key={day.dayNumber}>
                       <TableCell>{day.dayNumber}</TableCell>
                       <TableCell className="text-right">
-                        {Math.round(day.hours)}h
+                        {formatHoursOrMinutes(toNumber(day.hours))}
                       </TableCell>
                       <TableCell className="text-right">
                         {formatDietAmount(day.baseAmount, isForeignDay)}

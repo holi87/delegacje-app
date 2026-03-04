@@ -231,6 +231,14 @@ function accommodationTypeLabel(type: string): string {
   return labels[type] ?? type;
 }
 
+function formatHoursOrMinutes(hours: number): string {
+  const safeHours = Number.isFinite(hours) ? Math.max(0, hours) : 0;
+  if (safeHours > 0 && safeHours < 1) {
+    return `${Math.round(safeHours * 60)} min`;
+  }
+  return formatDecimal(safeHours, 1);
+}
+
 /** Format duration as "X dob i Y godzin" */
 function formatDuration(departureAt: Date, returnAt: Date): string {
   const totalMinutes = (returnAt.getTime() - departureAt.getTime()) / (1000 * 60);
@@ -249,10 +257,14 @@ function formatDuration(departureAt: Date, returnAt: Date): string {
     }
   }
   if (remainingHours > 0) {
-    parts.push(`${formatDecimal(remainingHours, 1)} godzin`);
+    if (remainingHours < 1) {
+      parts.push(`${Math.round(remainingHours * 60)} min`);
+    } else {
+      parts.push(`${formatDecimal(remainingHours, 1)} godz.`);
+    }
   }
   if (parts.length === 0) {
-    return '0 godzin';
+    return '0 min';
   }
   return parts.join(' i ');
 }
@@ -618,7 +630,7 @@ function renderDietTable(
         { header: 'Nr', width: 25, align: 'center' },
         { header: 'Data', width: 65, align: 'center' },
         { header: 'Odcinek', width: 55, align: 'center' },
-        { header: 'Godzin', width: 45, align: 'right' },
+        { header: 'Czas', width: 45, align: 'right' },
         { header: 'Dieta naliczona', width: 85, align: 'right' },
         { header: 'Pomniejszenia', width: 90, align: 'right' },
         { header: 'Dieta netto', width: CONTENT_WIDTH - 25 - 65 - 55 - 45 - 85 - 90, align: 'right' },
@@ -626,7 +638,7 @@ function renderDietTable(
     : [
         { header: 'Nr', width: 30, align: 'center' },
         { header: 'Data', width: 75, align: 'center' },
-        { header: 'Godzin', width: 55, align: 'right' },
+        { header: 'Czas', width: 55, align: 'right' },
         { header: 'Dieta naliczona', width: 95, align: 'right' },
         { header: 'Pomniejszenia', width: 100, align: 'right' },
         { header: 'Dieta netto', width: CONTENT_WIDTH - 30 - 75 - 55 - 95 - 100, align: 'right' },
@@ -676,7 +688,7 @@ function renderDietTable(
           day.dayNumber.toString(),
           formatDate(day.date),
           segment,
-          formatDecimal(d2n(day.hoursInDay), 1),
+          formatHoursOrMinutes(d2n(day.hoursInDay)),
           formatAmountByCurrency(base, dayCurrency),
           deductionText,
           formatAmountByCurrency(final_, dayCurrency),
@@ -687,7 +699,7 @@ function renderDietTable(
         cells: [
           day.dayNumber.toString(),
           formatDate(day.date),
-          formatDecimal(d2n(day.hoursInDay), 1),
+          formatHoursOrMinutes(d2n(day.hoursInDay)),
           formatPLN(base),
           deductionText,
           formatPLN(final_),
