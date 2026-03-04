@@ -19,6 +19,11 @@ const documentNumberSchema = z
   .trim()
   .min(1, 'Numer dokumentu ksiegowego jest wymagany')
   .max(64, 'Numer dokumentu ksiegowego moze miec maksymalnie 64 znaki');
+const currencyCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z]{3}$/, 'Kod waluty musi miec 3 litery (np. PLN, USD)')
+  .transform((value) => value.toUpperCase());
 
 // =====================
 // Sub-schemas
@@ -36,6 +41,7 @@ const delegationDaySchema = z.object({
     .optional()
     .default(null),
   accommodationReceiptNumber: documentNumberSchema.nullable().optional().default(null),
+  accommodationCurrency: currencyCodeSchema.nullable().optional().default(null),
   isForeign: z.boolean().default(false),
 });
 
@@ -121,10 +127,14 @@ export const createDelegationSchema = z
     (data) =>
       data.days.every((day) => {
         if (day.accommodationType !== 'RECEIPT') return true;
-        return day.accommodationCost != null && !!day.accommodationReceiptNumber?.trim();
+        return (
+          day.accommodationCost != null &&
+          !!day.accommodationReceiptNumber?.trim() &&
+          !!day.accommodationCurrency
+        );
       }),
     {
-      message: 'Dla noclegu wg rachunku wymagane są: kwota oraz numer dokumentu księgowego',
+      message: 'Dla noclegu wg rachunku wymagane są: kwota, numer dokumentu księgowego i waluta',
       path: ['days'],
     }
   );
@@ -173,10 +183,14 @@ export const updateDelegationSchema = z
       !data.days ||
       data.days.every((day) => {
         if (day.accommodationType !== 'RECEIPT') return true;
-        return day.accommodationCost != null && !!day.accommodationReceiptNumber?.trim();
+        return (
+          day.accommodationCost != null &&
+          !!day.accommodationReceiptNumber?.trim() &&
+          !!day.accommodationCurrency
+        );
       }),
     {
-      message: 'Dla noclegu wg rachunku wymagane są: kwota oraz numer dokumentu księgowego',
+      message: 'Dla noclegu wg rachunku wymagane są: kwota, numer dokumentu księgowego i waluta',
       path: ['days'],
     }
   );

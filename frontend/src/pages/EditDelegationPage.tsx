@@ -133,6 +133,10 @@ function buildApiPayload(data: DelegationFormValues) {
         d.accommodationType === 'RECEIPT'
           ? (d.accommodationReceiptNumber?.trim() || null)
           : null,
+      accommodationCurrency:
+        d.accommodationType === 'RECEIPT'
+          ? (d.accommodationCurrency?.trim().toUpperCase() || null)
+          : null,
       isForeign: d.isForeign ?? false,
     })),
     mileageDetails: data.mileageDetails
@@ -185,6 +189,7 @@ function mapDelegationToFormValues(delegation: any): DelegationFormValues {
         accommodationType: d.accommodationType ?? 'NONE',
         accommodationCost: d.accommodationCost ?? null,
         accommodationReceiptNumber: d.accommodationReceiptNumber ?? null,
+        accommodationCurrency: d.accommodationCurrency ?? null,
         isForeign: !!d.isForeign,
       })),
     mileageDetails: delegation.mileageDetails

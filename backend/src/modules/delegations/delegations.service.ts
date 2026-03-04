@@ -199,6 +199,7 @@ function serializeDelegation(delegation: any) {
       accommodationType: d.accommodationType,
       accommodationCost: decimalToString(d.accommodationCost),
       accommodationReceiptNumber: d.accommodationReceiptNumber ?? null,
+      accommodationCurrency: d.accommodationCurrency ?? null,
       dietBase: decimalToString(d.dietBase),
       dietDeductions: decimalToString(d.dietDeductions),
       dietFinal: decimalToString(d.dietFinal),
@@ -343,6 +344,10 @@ export async function createDelegation(
               ? new Prisma.Decimal(day.accommodationCost)
               : null,
             accommodationReceiptNumber: day.accommodationReceiptNumber ?? null,
+            accommodationCurrency:
+              day.accommodationType === 'RECEIPT'
+                ? day.accommodationCurrency ?? null
+                : null,
             isForeign: day.isForeign ?? false,
           })),
         },
@@ -454,6 +459,10 @@ export async function updateDelegation(
             ? new Prisma.Decimal(day.accommodationCost)
             : null,
           accommodationReceiptNumber: day.accommodationReceiptNumber ?? null,
+          accommodationCurrency:
+            day.accommodationType === 'RECEIPT'
+              ? day.accommodationCurrency ?? null
+              : null,
           isForeign: day.isForeign ?? false,
         })),
       });
@@ -863,6 +872,7 @@ function buildCalculationInput(delegation: any): CalculationInput {
       accommodationType: d.accommodationType,
       accommodationCost: d.accommodationCost ? Number(d.accommodationCost.toString()) : null,
       accommodationReceiptNumber: d.accommodationReceiptNumber ?? null,
+      accommodationCurrency: d.accommodationCurrency ?? null,
     })),
     mileageDetails: delegation.mileageDetails
       ? {
@@ -908,6 +918,7 @@ function buildForeignCalculationInput(delegation: any): ForeignDelegationInput {
     accommodationType: d.accommodationType,
     accommodationCost: d.accommodationCost ? Number(d.accommodationCost.toString()) : null,
     accommodationReceiptNumber: d.accommodationReceiptNumber ?? null,
+    accommodationCurrency: d.accommodationCurrency ?? null,
   }));
 
   // Backward compatibility: infer foreign segment when old drafts have no isForeign flags.

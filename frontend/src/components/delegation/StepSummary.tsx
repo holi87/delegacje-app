@@ -217,14 +217,27 @@ export function StepSummary({
     }
     return formatCurrency(value);
   };
-  const formatAccommodationAmount = (
-    value: string | number,
-    isForeign: boolean
-  ) => {
-    if (isForeign && foreignCurrency) {
-      return formatCurrencyByCode(value, foreignCurrency);
+  const resolveNightCurrency = (night: any): string => {
+    const fromNight = String(night?.currency ?? '').trim().toUpperCase();
+    if (/^[A-Z]{3}$/.test(fromNight)) return fromNight;
+    if (!!night?.isForeign && foreignCurrency) return foreignCurrency;
+    return 'PLN';
+  };
+  const formatAccommodationAmount = (night: any): string => {
+    const currency = resolveNightCurrency(night);
+    const cappedAmount = toNumber(night?.amount);
+    const cappedLabel = formatCurrencyByCode(cappedAmount, currency);
+    const originalRaw = night?.originalAmount;
+    if (originalRaw == null) {
+      return cappedLabel;
     }
-    return formatCurrency(value);
+
+    const originalAmount = toNumber(originalRaw);
+    if (!night?.overLimit || originalAmount <= cappedAmount) {
+      return cappedLabel;
+    }
+
+    return `${cappedLabel} (z kwoty ${formatCurrencyByCode(originalAmount, currency)})`;
   };
 
   // No result yet
@@ -408,7 +421,7 @@ export function StepSummary({
                     </TableCell>
                     <TableCell>{night.receiptNumber || '---'}</TableCell>
                     <TableCell className="text-right">
-                      {formatAccommodationAmount(night.amount, !!night.isForeign)}
+                      {formatAccommodationAmount(night)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -420,20 +433,30 @@ export function StepSummary({
                   </TableCell>
                   <TableCell className="text-right font-semibold">
                     {calc.isForeign ? (
-                      <span>
-                        {formatCurrency(
-                          calc.accommodation.nights
-                            .filter((n) => !n.isForeign)
-                            .reduce((sum, n) => sum + toNumber(n.amount), 0)
-                        )}{' '}
-                        +{' '}
-                        {formatCurrencyByCode(
-                          calc.accommodation.nights
-                            .filter((n) => !!n.isForeign)
-                            .reduce((sum, n) => sum + toNumber(n.amount), 0),
-                          foreignCurrency ?? 'PLN'
-                        )}
-                      </span>
+                      (() => {
+                        const foreignCode = (foreignCurrency ?? '').toUpperCase();
+                        const plnTotal = calc.accommodation.nights
+                          .filter((n) => resolveNightCurrency(n) === 'PLN')
+                          .reduce((sum, n) => sum + toNumber(n.amount), 0);
+                        const foreignTotal = foreignCode
+                          ? calc.accommodation.nights
+                              .filter((n) => resolveNightCurrency(n) === foreignCode)
+                              .reduce((sum, n) => sum + toNumber(n.amount), 0)
+                          : 0;
+
+                        if (foreignTotal > 0 && plnTotal > 0) {
+                          return (
+                            <span>
+                              {formatCurrency(plnTotal)} +{' '}
+                              {formatCurrencyByCode(foreignTotal, foreignCode)}
+                            </span>
+                          );
+                        }
+                        if (foreignTotal > 0) {
+                          return formatCurrencyByCode(foreignTotal, foreignCode);
+                        }
+                        return formatCurrency(plnTotal);
+                      })()
                     ) : (
                       formatCurrency(calc.accommodation.total)
                     )}
@@ -653,6 +676,10 @@ function buildApiPayload(data: DelegationFormValues) {
       accommodationReceiptNumber:
         d.accommodationType === 'RECEIPT'
           ? (d.accommodationReceiptNumber?.trim() || null)
+          : null,
+      accommodationCurrency:
+        d.accommodationType === 'RECEIPT'
+          ? (d.accommodationCurrency?.trim().toUpperCase() || null)
           : null,
       isForeign: d.isForeign ?? false,
     })),

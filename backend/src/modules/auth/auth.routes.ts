@@ -13,6 +13,18 @@ export async function authRoutes(app: FastifyInstance) {
     },
   };
 
+  const useSecureCookies =
+    app.config.NODE_ENV === 'production' &&
+    app.config.CORS_ORIGIN.toLowerCase().startsWith('https://');
+
+  const refreshCookieOptions = {
+    httpOnly: true,
+    secure: useSecureCookies,
+    sameSite: 'strict' as const,
+    path: '/api/v1/auth/refresh',
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+  };
+
   app.post('/login', loginRateLimit, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -46,13 +58,7 @@ export async function authRoutes(app: FastifyInstance) {
       { expiresIn: '7d' }
     );
 
-    reply.setCookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: app.config.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/api/v1/auth/refresh',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-    });
+    reply.setCookie('refreshToken', refreshToken, refreshCookieOptions);
 
     return {
       accessToken,
@@ -106,13 +112,7 @@ export async function authRoutes(app: FastifyInstance) {
         { expiresIn: '7d' }
       );
 
-      reply.setCookie('refreshToken', newRefreshToken, {
-        httpOnly: true,
-        secure: app.config.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/api/v1/auth/refresh',
-        maxAge: 7 * 24 * 60 * 60, // 7 days
-      });
+      reply.setCookie('refreshToken', newRefreshToken, refreshCookieOptions);
 
       return { accessToken };
     } catch {

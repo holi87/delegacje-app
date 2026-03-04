@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { checkSetupStatus } from '@/api/auth';
+import { checkSetupStatus, getMe, refreshAccessToken } from '@/api/auth';
 import { useAuthStore } from '@/stores/authStore';
 import { AppShell } from '@/components/layout/AppShell';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -52,6 +53,12 @@ function LoadingScreen() {
 }
 
 export default function App() {
+  const [isAuthRestoring, setIsAuthRestoring] = useState(true);
+
+  const setAccessToken = useAuthStore((s) => s.setAccessToken);
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const logout = useAuthStore((s) => s.logout);
+
   const { data: setupStatus, isLoading } = useQuery({
     queryKey: ['setup-status'],
     queryFn: checkSetupStatus,
@@ -59,7 +66,56 @@ export default function App() {
     retry: false,
   });
 
-  if (isLoading) {
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (setupStatus?.needsSetup) {
+      setIsAuthRestoring(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      try {
+        let token = useAuthStore.getState().accessToken;
+
+        if (!token) {
+          const refreshed = await refreshAccessToken();
+          token = refreshed.accessToken;
+          setAccessToken(token);
+        }
+
+        const me = await getMe();
+        setAuth(token, {
+          id: me.user.id,
+          email: me.user.email,
+          role: me.user.role,
+          profile: me.profile
+            ? {
+                firstName: me.profile.firstName,
+                lastName: me.profile.lastName,
+                position: me.profile.position,
+              }
+            : null,
+        });
+      } catch {
+        logout();
+      } finally {
+        if (!cancelled) {
+          setIsAuthRestoring(false);
+        }
+      }
+    };
+
+    void restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, setupStatus?.needsSetup, setAccessToken, setAuth, logout]);
+
+  if (isLoading || isAuthRestoring) {
     return <LoadingScreen />;
   }
 

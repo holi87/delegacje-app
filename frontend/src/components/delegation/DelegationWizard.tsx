@@ -52,6 +52,12 @@ const delegationDaySchema = z.object({
   accommodationType: z.enum(['RECEIPT', 'LUMP_SUM', 'FREE', 'NONE']),
   accommodationCost: z.string().nullable().optional(),
   accommodationReceiptNumber: z.string().nullable().optional(),
+  accommodationCurrency: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{3}$/, 'Kod waluty musi miec 3 litery')
+    .nullable()
+    .optional(),
   isForeign: z.boolean().default(false),
 });
 
@@ -150,6 +156,17 @@ export const delegationFormSchema = z
           code: z.ZodIssueCode.custom,
           path: ['days', index, 'accommodationReceiptNumber'],
           message: 'Numer dokumentu ksiegowego jest wymagany',
+        });
+      }
+
+      const hasCurrency =
+        day.accommodationCurrency != null &&
+        String(day.accommodationCurrency).trim() !== '';
+      if (!hasCurrency) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['days', index, 'accommodationCurrency'],
+          message: 'Waluta rachunku jest wymagana',
         });
       }
     });

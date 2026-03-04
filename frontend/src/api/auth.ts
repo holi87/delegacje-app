@@ -15,6 +15,29 @@ export interface LoginResponse {
   };
 }
 
+export interface RefreshResponse {
+  accessToken: string;
+}
+
+export interface MeResponse {
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    isActive: boolean;
+    createdAt: string;
+  };
+  profile: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    position: string;
+    defaultVehicle: string | null;
+    vehiclePlate: string | null;
+    vehicleCapacity: string | null;
+  } | null;
+}
+
 export async function login(data: LoginRequest): Promise<LoginResponse> {
   const response = await apiClient.post<LoginResponse>('/auth/login', data);
   return response.data;
@@ -24,8 +47,13 @@ export async function logout(): Promise<void> {
   await apiClient.post('/auth/logout');
 }
 
-export async function getMe() {
-  const response = await apiClient.get('/auth/me');
+export async function refreshAccessToken(): Promise<RefreshResponse> {
+  const response = await apiClient.post<RefreshResponse>('/auth/refresh');
+  return response.data;
+}
+
+export async function getMe(): Promise<MeResponse> {
+  const response = await apiClient.get<MeResponse>('/auth/me');
   return response.data;
 }
 

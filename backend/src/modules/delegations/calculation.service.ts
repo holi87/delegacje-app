@@ -15,6 +15,7 @@ interface DayInput {
   accommodationType: 'RECEIPT' | 'LUMP_SUM' | 'FREE' | 'NONE';
   accommodationCost: number | null;
   accommodationReceiptNumber?: string | null;
+  accommodationCurrency?: string | null;
 }
 
 interface MileageInput {
@@ -74,6 +75,8 @@ interface DietResult {
 interface AccommodationNight {
   type: string;
   amount: number;
+  originalAmount?: number;
+  currency?: string | null;
   overLimit?: boolean;
   receiptNumber?: string | null;
 }
@@ -381,12 +384,18 @@ function calculateAccommodation(
     switch (day.accommodationType) {
       case 'RECEIPT': {
         const cost = day.accommodationCost ?? 0;
+        const currency = (day.accommodationCurrency ?? 'PLN').toUpperCase();
+        if (currency !== 'PLN') {
+          throw new Error('Dla delegacji krajowej rachunek noclegowy musi byc w walucie PLN');
+        }
         // Cap at max receipt limit; flag if over limit (needs admin approval)
         const amount = round2(Math.min(cost, rate.accommodationMaxReceipt));
         const overLimit = cost > rate.accommodationMaxReceipt;
         nights.push({
           type: 'RECEIPT',
           amount,
+          originalAmount: round2(cost),
+          currency: 'PLN',
           overLimit,
           receiptNumber: day.accommodationReceiptNumber ?? null,
         });
@@ -395,12 +404,12 @@ function calculateAccommodation(
       }
       case 'LUMP_SUM': {
         const lumpSum = rate.accommodationLumpSum;
-        nights.push({ type: 'LUMP_SUM', amount: lumpSum });
+        nights.push({ type: 'LUMP_SUM', amount: lumpSum, currency: 'PLN' });
         total += lumpSum;
         break;
       }
       case 'FREE': {
-        nights.push({ type: 'FREE', amount: 0 });
+        nights.push({ type: 'FREE', amount: 0, currency: 'PLN' });
         break;
       }
       case 'NONE': {

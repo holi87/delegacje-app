@@ -16,6 +16,7 @@ interface DayInput {
   accommodationType: 'RECEIPT' | 'LUMP_SUM' | 'FREE' | 'NONE';
   accommodationCost: number | null;
   accommodationReceiptNumber?: string | null;
+  accommodationCurrency?: string | null;
 }
 
 interface MileageInput {
@@ -87,7 +88,9 @@ interface ForeignDietResult {
 interface AccommodationNight {
   type: string;
   amount: number;
+  originalAmount?: number;
   isForeign: boolean;
+  currency?: string | null;
   overLimit?: boolean;
   receiptNumber?: string | null;
 }
@@ -301,6 +304,36 @@ function decimalToNumber(value: Decimal | number | string): number {
 /** Round to 2 decimal places (PLN grosze). */
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function convertBetweenPlnAndForeign(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string,
+  foreignCurrency: string,
+  plnPerForeignRate: number
+): number {
+  const from = fromCurrency.toUpperCase();
+  const to = toCurrency.toUpperCase();
+  const foreign = foreignCurrency.toUpperCase();
+
+  if (from === to) return round2(amount);
+
+  if (plnPerForeignRate <= 0) {
+    throw new Error('Nieprawidlowy kurs NBP do przeliczenia limitu noclegu');
+  }
+
+  if (from === 'PLN' && to === foreign) {
+    return round2(amount / plnPerForeignRate);
+  }
+
+  if (from === foreign && to === 'PLN') {
+    return round2(amount * plnPerForeignRate);
+  }
+
+  throw new Error(
+    `Nieobslugiwane przeliczenie limitu noclegu: ${from} -> ${to} (dozwolone: PLN <-> ${foreign})`
+  );
 }
 
 // =====================
@@ -596,7 +629,8 @@ function calculateForeignSegmentDiet(
 function calculateForeignAccommodation(
   days: DayInput[],
   domesticRate: DomesticRateData,
-  foreignRate: ForeignRateData
+  foreignRate: ForeignRateData,
+  plnPerForeignRate: number
 ): AccommodationResult {
   const nights: AccommodationNight[] = [];
   let total = 0;
@@ -606,53 +640,74 @@ function calculateForeignAccommodation(
 
     switch (day.accommodationType) {
       case 'RECEIPT': {
-        const cost = day.accommodationCost ?? 0;
+        const originalAmount = round2(day.accommodationCost ?? 0);
+        const defaultCurrency = isForeign ? foreignRate.currency : 'PLN';
+        const currency = (day.accommodationCurrency ?? defaultCurrency).toUpperCase();
+        const foreignCurrency = foreignRate.currency.toUpperCase();
 
-        if (isForeign) {
-          // Foreign: cap at country's accommodationLimit
-          const maxReceipt = foreignRate.accommodationLimit;
-          const amount = round2(Math.min(cost, maxReceipt));
-          const overLimit = cost > maxReceipt;
-          nights.push({
-            type: 'RECEIPT',
-            amount,
-            isForeign: true,
-            overLimit,
-            receiptNumber: day.accommodationReceiptNumber ?? null,
-          });
-          total += amount;
-        } else {
-          // Domestic: cap at domestic max receipt
-          const maxReceipt = domesticRate.accommodationMaxReceipt;
-          const amount = round2(Math.min(cost, maxReceipt));
-          const overLimit = cost > maxReceipt;
-          nights.push({
-            type: 'RECEIPT',
-            amount,
-            isForeign: false,
-            overLimit,
-            receiptNumber: day.accommodationReceiptNumber ?? null,
-          });
-          total += amount;
+        if (currency !== 'PLN' && currency !== foreignCurrency) {
+          throw new Error(
+            `Nieobslugiwana waluta rachunku noclegowego: ${currency}. Dopuszczalne: PLN albo ${foreignCurrency}`
+          );
         }
+
+        const legalLimitCurrency = isForeign ? foreignCurrency : 'PLN';
+        const legalLimitAmount = isForeign
+          ? foreignRate.accommodationLimit
+          : domesticRate.accommodationMaxReceipt;
+        const maxReceipt = convertBetweenPlnAndForeign(
+          legalLimitAmount,
+          legalLimitCurrency,
+          currency,
+          foreignCurrency,
+          plnPerForeignRate
+        );
+
+        const amount = round2(Math.min(originalAmount, maxReceipt));
+        const overLimit = originalAmount > maxReceipt;
+        nights.push({
+          type: 'RECEIPT',
+          amount,
+          originalAmount,
+          isForeign,
+          currency,
+          overLimit,
+          receiptNumber: day.accommodationReceiptNumber ?? null,
+        });
+        total += amount;
         break;
       }
       case 'LUMP_SUM': {
         if (isForeign) {
           // Foreign lump sum: 25% of country's accommodationLimit
           const lumpSum = round2(foreignRate.accommodationLimit * 0.25);
-          nights.push({ type: 'LUMP_SUM', amount: lumpSum, isForeign: true });
+          nights.push({
+            type: 'LUMP_SUM',
+            amount: lumpSum,
+            isForeign: true,
+            currency: foreignRate.currency,
+          });
           total += lumpSum;
         } else {
           // Domestic lump sum
           const lumpSum = domesticRate.accommodationLumpSum;
-          nights.push({ type: 'LUMP_SUM', amount: lumpSum, isForeign: false });
+          nights.push({
+            type: 'LUMP_SUM',
+            amount: lumpSum,
+            isForeign: false,
+            currency: 'PLN',
+          });
           total += lumpSum;
         }
         break;
       }
       case 'FREE': {
-        nights.push({ type: 'FREE', amount: 0, isForeign });
+        nights.push({
+          type: 'FREE',
+          amount: 0,
+          isForeign,
+          currency: isForeign ? foreignRate.currency : 'PLN',
+        });
         break;
       }
       case 'NONE': {
@@ -826,33 +881,37 @@ export async function calculateForeignDelegation(
     foreignDietDays.reduce((sum, d) => sum + d.finalAmount, 0)
   );
 
-  // 5. Calculate accommodation (handles both domestic and foreign nights)
+  // 5. Currency conversion source (used by diet/accommodation conversions)
+  const nbpRate = await fetchNbpRate(foreignRate.currency, new Date());
+
+  // 6. Calculate accommodation (handles both domestic and foreign nights)
   const accommodationResult = calculateForeignAccommodation(
     input.days,
     domesticRate,
-    foreignRate
+    foreignRate,
+    nbpRate.rate
   );
 
-  // 6. Calculate transport
+  // 7. Calculate transport
   const transportResult = await calculateTransport(prisma, input, departureDate);
 
-  // 7. Calculate additional costs
+  // 8. Calculate additional costs
   const additionalCostsResult = calculateAdditionalCosts(input.additionalCosts);
 
-  // 8. Currency conversion (foreign parts -> PLN)
-  const nbpRate = await fetchNbpRate(foreignRate.currency, new Date());
+  // 9. Currency conversion (foreign parts -> PLN)
 
   const foreignDietTotalPln = round2(foreignDietTotal * nbpRate.rate);
   const dietTotal = round2(domesticDietTotal + foreignDietTotalPln);
 
+  const foreignCurrencyCode = foreignRate.currency.toUpperCase();
   const domesticAccommodationTotal = round2(
     accommodationResult.nights
-      .filter((night) => !night.isForeign)
+      .filter((night) => (night.currency ?? 'PLN').toUpperCase() === 'PLN')
       .reduce((sum, night) => sum + night.amount, 0)
   );
   const foreignAccommodationTotal = round2(
     accommodationResult.nights
-      .filter((night) => night.isForeign)
+      .filter((night) => (night.currency ?? '').toUpperCase() === foreignCurrencyCode)
       .reduce((sum, night) => sum + night.amount, 0)
   );
   const foreignAccommodationTotalPln = round2(
@@ -862,7 +921,7 @@ export async function calculateForeignDelegation(
     domesticAccommodationTotal + foreignAccommodationTotalPln
   );
 
-  // 9. Summary (all totals in PLN)
+  // 10. Summary (all totals in PLN)
   const grandTotal = round2(
     dietTotal +
       accommodationTotal +

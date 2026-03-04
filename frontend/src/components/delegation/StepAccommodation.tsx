@@ -47,6 +47,11 @@ function parseAmount(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeCurrencyCode(value: string | null | undefined): string | null {
+  const normalized = String(value ?? '').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
+}
+
 function formatAmountByCurrency(amount: number, currency: string): string {
   if (currency === 'PLN') return formatCurrency(amount);
   return `${amount.toLocaleString('pl-PL', {
@@ -169,9 +174,17 @@ export function StepAccommodation() {
     () => foreignRates.find((r) => r.countryCode === foreignCountry) ?? null,
     [foreignRates, foreignCountry]
   );
+  const foreignCurrencyCode = normalizeCurrencyCode(selectedForeignRate?.currency) ?? 'PLN';
   const foreignAccommodationLimit = selectedForeignRate
     ? parseAmount(selectedForeignRate.accommodationLimit)
     : null;
+
+  const receiptCurrencyOptions = useMemo(() => {
+    if (delegationType !== 'FOREIGN' || foreignCurrencyCode === 'PLN') {
+      return ['PLN'];
+    }
+    return ['PLN', foreignCurrencyCode];
+  }, [delegationType, foreignCurrencyCode]);
 
   const nights = useMemo(
     () => calculateNights(departureAt, returnAt),
@@ -180,6 +193,7 @@ export function StepAccommodation() {
 
   const [bulkReceiptAmount, setBulkReceiptAmount] = useState('');
   const [bulkReceiptNumber, setBulkReceiptNumber] = useState('');
+  const [bulkReceiptCurrency, setBulkReceiptCurrency] = useState('PLN');
   const [bulkDistributionMode, setBulkDistributionMode] = useState<'ALL' | 'SELECTED'>('ALL');
   const [bulkSelectedNights, setBulkSelectedNights] = useState<number[]>([]);
 
@@ -199,10 +213,6 @@ export function StepAccommodation() {
       const isForeign = delegationType === 'FOREIGN' && (
         hasBorderData ? inferredForeign : !!dayIsForeign
       );
-      const receiptLimit =
-        isForeign && foreignAccommodationLimit != null
-          ? foreignAccommodationLimit
-          : DOMESTIC_MAX_RECEIPT_AMOUNT;
       const lumpSumAmount =
         isForeign && foreignAccommodationLimit != null
           ? round2(foreignAccommodationLimit * 0.25)
@@ -214,7 +224,6 @@ export function StepAccommodation() {
 
       return {
         isForeign,
-        receiptLimit,
         lumpSumAmount,
         currency,
       };
@@ -228,6 +237,30 @@ export function StepAccommodation() {
     foreignAccommodationLimit,
     selectedForeignRate?.currency,
   ]);
+
+  const getDefaultReceiptCurrency = (nightIndex: number): string => {
+    if (
+      delegationType === 'FOREIGN' &&
+      nightsMeta[nightIndex]?.isForeign &&
+      receiptCurrencyOptions.includes(foreignCurrencyCode)
+    ) {
+      return foreignCurrencyCode;
+    }
+    return 'PLN';
+  };
+
+  const getNightReceiptCurrency = (nightIndex: number): string => {
+    const current = normalizeCurrencyCode(days?.[nightIndex]?.accommodationCurrency);
+    if (current && receiptCurrencyOptions.includes(current)) {
+      return current;
+    }
+    return getDefaultReceiptCurrency(nightIndex);
+  };
+
+  const getReceiptLimitByCurrency = (currency: string): number =>
+    currency === 'PLN' || foreignAccommodationLimit == null
+      ? DOMESTIC_MAX_RECEIPT_AMOUNT
+      : foreignAccommodationLimit;
 
   const nightTypes = nights.map(
     (_, idx) =>
@@ -244,6 +277,16 @@ export function StepAccommodation() {
     });
   }, [nights.length]);
 
+  useEffect(() => {
+    if (!receiptCurrencyOptions.includes(bulkReceiptCurrency)) {
+      setBulkReceiptCurrency(
+        receiptCurrencyOptions.includes(foreignCurrencyCode)
+          ? foreignCurrencyCode
+          : receiptCurrencyOptions[0] ?? 'PLN'
+      );
+    }
+  }, [receiptCurrencyOptions, bulkReceiptCurrency, foreignCurrencyCode]);
+
   // Ensure day entries exist for nights and clear accommodation on non-night rows.
   useEffect(() => {
     const currentDays = days || [];
@@ -258,6 +301,13 @@ export function StepAccommodation() {
       const nextCost = nextType === 'RECEIPT' ? (current?.accommodationCost ?? null) : null;
       const nextReceiptNumber =
         nextType === 'RECEIPT' ? (current?.accommodationReceiptNumber ?? null) : null;
+      const currentCurrency = normalizeCurrencyCode(current?.accommodationCurrency);
+      const nextCurrency =
+        nextType === 'RECEIPT'
+          ? (currentCurrency && receiptCurrencyOptions.includes(currentCurrency)
+              ? currentCurrency
+              : getDefaultReceiptCurrency(idx))
+          : null;
 
       if (!current) {
         updatedDays[idx] = {
@@ -269,6 +319,7 @@ export function StepAccommodation() {
           accommodationType: nextType,
           accommodationCost: nextCost,
           accommodationReceiptNumber: nextReceiptNumber,
+          accommodationCurrency: nextCurrency,
           isForeign: false,
         };
         changed = true;
@@ -278,13 +329,15 @@ export function StepAccommodation() {
       if (
         current.accommodationType !== nextType ||
         (current.accommodationCost ?? null) !== nextCost ||
-        (current.accommodationReceiptNumber ?? null) !== nextReceiptNumber
+        (current.accommodationReceiptNumber ?? null) !== nextReceiptNumber ||
+        (normalizeCurrencyCode(current.accommodationCurrency) ?? null) !== nextCurrency
       ) {
         updatedDays[idx] = {
           ...current,
           accommodationType: nextType,
           accommodationCost: nextCost,
           accommodationReceiptNumber: nextReceiptNumber,
+          accommodationCurrency: nextCurrency,
         };
         changed = true;
       }
@@ -296,13 +349,15 @@ export function StepAccommodation() {
       if (
         current.accommodationType !== 'NONE' ||
         current.accommodationCost != null ||
-        current.accommodationReceiptNumber != null
+        current.accommodationReceiptNumber != null ||
+        current.accommodationCurrency != null
       ) {
         updatedDays[idx] = {
           ...current,
           accommodationType: 'NONE',
           accommodationCost: null,
           accommodationReceiptNumber: null,
+          accommodationCurrency: null,
         };
         changed = true;
       }
@@ -311,7 +366,7 @@ export function StepAccommodation() {
     if (changed) {
       setValue('days', updatedDays);
     }
-  }, [days, nights, defaultNightType, setValue]);
+  }, [days, nights, defaultNightType, setValue, nightsMeta, receiptCurrencyOptions, foreignCurrencyCode]);
 
   const handleAccommodationTypeChange = (value: string) => {
     const nextType = value as GlobalAccommodationType;
@@ -338,16 +393,25 @@ export function StepAccommodation() {
       const nextCost = nextType === 'RECEIPT' ? (current.accommodationCost ?? null) : null;
       const nextReceiptNumber =
         nextType === 'RECEIPT' ? (current.accommodationReceiptNumber ?? null) : null;
+      const currentCurrency = normalizeCurrencyCode(current.accommodationCurrency);
+      const nextCurrency =
+        nextType === 'RECEIPT'
+          ? (currentCurrency && receiptCurrencyOptions.includes(currentCurrency)
+              ? currentCurrency
+              : getDefaultReceiptCurrency(idx))
+          : null;
       if (
         current.accommodationType !== nextType ||
         (current.accommodationCost ?? null) !== nextCost ||
-        (current.accommodationReceiptNumber ?? null) !== nextReceiptNumber
+        (current.accommodationReceiptNumber ?? null) !== nextReceiptNumber ||
+        (normalizeCurrencyCode(current.accommodationCurrency) ?? null) !== nextCurrency
       ) {
         updatedDays[idx] = {
           ...current,
           accommodationType: nextType,
           accommodationCost: nextCost,
           accommodationReceiptNumber: nextReceiptNumber,
+          accommodationCurrency: nextCurrency,
         };
         changed = true;
       }
@@ -376,7 +440,15 @@ export function StepAccommodation() {
       accommodationType: 'NONE' as AccommodationType,
       accommodationCost: null,
       accommodationReceiptNumber: null,
+      accommodationCurrency: null,
     };
+    const currentCurrency = normalizeCurrencyCode(baseDay.accommodationCurrency);
+    const nextCurrency =
+      nextType === 'RECEIPT'
+        ? (currentCurrency && receiptCurrencyOptions.includes(currentCurrency)
+            ? currentCurrency
+            : getDefaultReceiptCurrency(nightIndex))
+        : null;
 
     currentDays[nightIndex] = {
       ...baseDay,
@@ -384,6 +456,7 @@ export function StepAccommodation() {
       accommodationCost: nextType === 'RECEIPT' ? (baseDay.accommodationCost ?? null) : null,
       accommodationReceiptNumber:
         nextType === 'RECEIPT' ? (baseDay.accommodationReceiptNumber ?? null) : null,
+      accommodationCurrency: nextCurrency,
     };
 
     setValue('days', currentDays, {
@@ -404,6 +477,7 @@ export function StepAccommodation() {
   const applyBulkReceiptDistribution = () => {
     const totalAmount = parseAmount(bulkReceiptAmount);
     const receiptNumber = bulkReceiptNumber.trim();
+    const receiptCurrency = normalizeCurrencyCode(bulkReceiptCurrency);
 
     if (totalAmount <= 0) {
       toast.error('Podaj poprawna kwote rachunku do podzialu.');
@@ -411,6 +485,10 @@ export function StepAccommodation() {
     }
     if (!receiptNumber) {
       toast.error('Podaj numer dokumentu ksiegowego.');
+      return;
+    }
+    if (!receiptCurrency || !receiptCurrencyOptions.includes(receiptCurrency)) {
+      toast.error('Wybierz poprawna walute rachunku.');
       return;
     }
 
@@ -429,12 +507,24 @@ export function StepAccommodation() {
     const updatedDays = [...currentDays];
 
     targetIndexes.forEach((nightIndex, splitIndex) => {
-      if (!updatedDays[nightIndex]) return;
+      const baseDay = updatedDays[nightIndex] ?? {
+        dayNumber: nightIndex + 1,
+        date: nights[nightIndex] ?? '',
+        breakfastProvided: false,
+        lunchProvided: false,
+        dinnerProvided: false,
+        isForeign: false,
+        accommodationType: 'NONE' as AccommodationType,
+        accommodationCost: null,
+        accommodationReceiptNumber: null,
+        accommodationCurrency: null,
+      };
       updatedDays[nightIndex] = {
-        ...updatedDays[nightIndex],
+        ...baseDay,
         accommodationType: 'RECEIPT',
         accommodationCost: split[splitIndex].toFixed(2),
         accommodationReceiptNumber: receiptNumber,
+        accommodationCurrency: receiptCurrency,
       };
     });
 
@@ -483,7 +573,7 @@ export function StepAccommodation() {
             Rachunek zbiorczy (automatyczny podzial kwoty)
           </h3>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-4">
             <div className="space-y-1">
               <Label className="text-xs">Kwota rachunku</Label>
               <Input
@@ -494,6 +584,24 @@ export function StepAccommodation() {
                 value={bulkReceiptAmount}
                 onChange={(e) => setBulkReceiptAmount(e.target.value)}
               />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Waluta</Label>
+              <Select
+                value={bulkReceiptCurrency}
+                onValueChange={(value) => setBulkReceiptCurrency(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {receiptCurrencyOptions.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label className="text-xs">Numer dokumentu ksiegowego</Label>
@@ -575,6 +683,8 @@ export function StepAccommodation() {
 
           {nights.map((nightDate, idx) => {
             const nightType = nightTypes[idx] ?? defaultNightType;
+            const nightReceiptCurrency = getNightReceiptCurrency(idx);
+            const nightReceiptLimit = getReceiptLimitByCurrency(nightReceiptCurrency);
 
             return (
               <div
@@ -626,9 +736,31 @@ export function StepAccommodation() {
                           },
                         })}
                       />
-                      <span className="text-xs text-muted-foreground">
-                        {nightsMeta[idx]?.currency ?? 'PLN'}
-                      </span>
+                      <Select
+                        value={nightReceiptCurrency}
+                        onValueChange={(value) =>
+                          setValue(
+                            `days.${idx}.accommodationCurrency`,
+                            normalizeCurrencyCode(value),
+                            {
+                              shouldDirty: true,
+                              shouldTouch: true,
+                              shouldValidate: true,
+                            }
+                          )
+                        }
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {receiptCurrencyOptions.map((code) => (
+                            <SelectItem key={code} value={code}>
+                              {code}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Input
                         placeholder="Nr dokumentu"
                         className="w-44"
@@ -652,14 +784,14 @@ export function StepAccommodation() {
 
                     {days?.[idx]?.accommodationCost &&
                       parseAmount(days[idx]?.accommodationCost || '0') >
-                        (nightsMeta[idx]?.receiptLimit ?? DOMESTIC_MAX_RECEIPT_AMOUNT) && (
+                        nightReceiptLimit && (
                         <div className="flex items-center gap-1 text-xs text-amber-600">
                           <AlertTriangle className="h-3.5 w-3.5" />
                           <span>
                             Ponad limit{' '}
                             {formatAmountByCurrency(
-                              nightsMeta[idx]?.receiptLimit ?? DOMESTIC_MAX_RECEIPT_AMOUNT,
-                              nightsMeta[idx]?.currency ?? 'PLN'
+                              nightReceiptLimit,
+                              nightReceiptCurrency
                             )}
                           </span>
                         </div>
@@ -672,6 +804,11 @@ export function StepAccommodation() {
                     {errors.days?.[idx]?.accommodationReceiptNumber && (
                       <p className="text-xs text-destructive">
                         {errors.days[idx]?.accommodationReceiptNumber?.message as string}
+                      </p>
+                    )}
+                    {errors.days?.[idx]?.accommodationCurrency && (
+                      <p className="text-xs text-destructive">
+                        {errors.days[idx]?.accommodationCurrency?.message as string}
                       </p>
                     )}
                   </div>

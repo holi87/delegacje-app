@@ -154,6 +154,7 @@ model DelegationDay {
   accommodationType AccommodationType @default(NONE) @map("accommodation_type")
   accommodationCost Decimal?          @db.Decimal(10, 2) @map("accommodation_cost")
   accommodationReceiptNumber String?  @map("accommodation_receipt_number")
+  accommodationCurrency String?       @map("accommodation_currency")
 
   dietBase       Decimal? @db.Decimal(10, 2) @map("diet_base")
   dietDeductions Decimal? @db.Decimal(10, 2) @map("diet_deductions")

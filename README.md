@@ -2,7 +2,7 @@
 
 Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i wspólników spółki. Zgodna z polskim prawem.
 
-**Aktualna wersja:** `1.3.1` (2026-03-04)
+**Aktualna wersja:** `1.4.0` (2026-03-04)
 
 ## Funkcje
 
@@ -238,6 +238,18 @@ Stawki konfigurowane przez admina — przy zmianie przepisów wystarczy zaktuali
 ---
 
 ## Changelog
+
+### [1.4.0] - 2026-03-04
+- Noclegi i limity walutowe:
+  - Dla delegacji zagranicznych limit noclegu jest przeliczany do waluty rachunku (`PLN` <-> waluta delegacji) przed porównaniem z kwotą z dokumentu
+  - Działa w obu kierunkach: rachunek w `PLN` przy limicie zagranicznym oraz rachunek w walucie zagranicznej przy limicie krajowym
+  - Wynik rozliczenia noclegu ponad limit jest opisywany jako: `AAA (z kwoty XXX)` na podsumowaniu i w szczegółach delegacji
+- Utrzymanie sesji logowania:
+  - Przy starcie aplikacji działa automatyczne odtworzenie sesji (`refresh` + `me`), bez konieczności ponownego logowania po odświeżeniu strony
+  - Poprawione ustawianie `refreshToken` cookie: `Secure` tylko dla środowisk HTTPS
+- PDF:
+  - W sekcji podsumowania kosztów kolejność linii została poprawiona: najpierw `Noclegi`, a dopiero potem `w tym noclegi zagraniczne w PLN`
+- Wersja aplikacji podbita do `1.4.0` (frontend/backend/PDF)
 
 ### [1.3.1] - 2026-03-04
 - Czas trwania:

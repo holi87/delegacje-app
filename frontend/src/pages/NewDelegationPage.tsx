@@ -83,6 +83,10 @@ function buildApiPayload(data: DelegationFormValues) {
         d.accommodationType === 'RECEIPT'
           ? (d.accommodationReceiptNumber?.trim() || null)
           : null,
+      accommodationCurrency:
+        d.accommodationType === 'RECEIPT'
+          ? (d.accommodationCurrency?.trim().toUpperCase() || null)
+          : null,
       isForeign: d.isForeign ?? false,
     })),
     mileageDetails: data.mileageDetails

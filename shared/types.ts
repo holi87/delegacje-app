@@ -89,6 +89,7 @@ export interface DelegationDayInput {
   accommodationType: AccommodationType;
   accommodationCost?: string | null;
   accommodationReceiptNumber?: string | null;
+  accommodationCurrency?: string | null;
   isForeign?: boolean;
 }
 
@@ -163,6 +164,8 @@ export interface CalculationResult {
     nights: Array<{
       type: AccommodationType;
       amount: string;
+      originalAmount?: string | number;
+      currency?: string | null;
       overLimit?: boolean;
       receiptNumber?: string | null;
     }>;
@@ -212,7 +215,9 @@ export interface ForeignCalculationResult {
     nights: Array<{
       type: AccommodationType;
       amount: string;
+      originalAmount?: string | number;
       isForeign?: boolean;
+      currency?: string | null;
       overLimit?: boolean;
       receiptNumber?: string | null;
     }>;

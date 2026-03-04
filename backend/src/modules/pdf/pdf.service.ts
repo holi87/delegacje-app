@@ -26,6 +26,7 @@ interface DelegationDayData {
   accommodationType: string;
   accommodationCost: Decimal | null;
   accommodationReceiptNumber: string | null;
+  accommodationCurrency: string | null;
   dietBase: Decimal | null;
   dietDeductions: Decimal | null;
   dietFinal: Decimal | null;
@@ -313,7 +314,7 @@ const COLOR_GRAY = '#666666';
 const COLOR_LIGHT_GRAY = '#CCCCCC';
 const COLOR_HEADER_BG = '#F0F0F0';
 const APP_NAME = 'Delegacje-APP';
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 const APP_REPOSITORY_URL = 'https://github.com/holi87/delegacje-app';
 
 // =====================
@@ -809,12 +810,18 @@ function renderAccommodationTable(
   let domesticTotal = 0;
   let foreignTotal = 0;
   let idx = 1;
+  const normalizedForeignCurrency = (foreignCurrency ?? '').toUpperCase();
 
   for (const night of nights) {
     const cost = d2n(night.accommodationCost);
-    const nightCurrency =
-      isForeignDelegation && night.isForeign ? foreignCurrency : 'PLN';
-    if (isForeignDelegation && night.isForeign) {
+    const nightCurrency = (
+      night.accommodationType === 'RECEIPT'
+        ? (night.accommodationCurrency ?? null)
+        : (isForeignDelegation && night.isForeign ? foreignCurrency : 'PLN')
+    ) ?? 'PLN';
+    const normalizedNightCurrency = nightCurrency.toUpperCase();
+
+    if (normalizedNightCurrency === normalizedForeignCurrency && normalizedForeignCurrency !== '') {
       foreignTotal += cost;
     } else {
       domesticTotal += cost;
@@ -847,11 +854,11 @@ function renderAccommodationTable(
   });
 
   y = drawTable(doc, MARGIN, y, columns, rows);
-  if (isForeignDelegation && foreignTotal > 0 && d2n(delegation.exchangeRate) > 0) {
+  if (isForeignDelegation && foreignTotal > 0 && d2n(delegation.exchangeRate) > 0 && normalizedForeignCurrency) {
     const rate = d2n(delegation.exchangeRate);
     doc.font(FONT_NORMAL).fontSize(FONT_SIZE_SMALL).fillColor(COLOR_GRAY);
     doc.text(
-      `W tym noclegi zagraniczne w PLN: ${formatPLN(foreignTotal * rate)} (kurs: ${rate.toFixed(4)})`,
+      `W tym noclegi w ${normalizedForeignCurrency} po kursie NBP: ${formatPLN(foreignTotal * rate)} (kurs: ${rate.toFixed(4)})`,
       MARGIN,
       y + 2
     );
@@ -1087,17 +1094,19 @@ function renderSummary(
         ['Diety:', formatPLN(dietTotal), false],
       ];
 
+  summaryLines.push(['Noclegi:', formatPLN(accommodationTotal), false]);
+
+  if (isForeign && delegation.exchangeRate && foreignAccommodationNominal > 0) {
+    summaryLines.push([
+      'w tym noclegi zagraniczne w PLN:',
+      `${formatPLN(foreignAccommodationNominal * exchangeRate)} (kurs: ${exchangeRate.toFixed(4)})`,
+      false,
+    ]);
+  }
+
   summaryLines.push(
-    ...(isForeign && delegation.exchangeRate && foreignAccommodationNominal > 0
-      ? [[
-          `w tym noclegi zagraniczne w PLN:`,
-          `${formatPLN(foreignAccommodationNominal * exchangeRate)} (kurs: ${exchangeRate.toFixed(4)})`,
-          false,
-        ] as [string, string, boolean]]
-      : []),
-    ['Noclegi:', formatPLN(accommodationTotal), false],
     ['Transport:', formatPLN(transportTotal), false],
-    ['Koszty dodatkowe:', formatPLN(additionalTotal), false],
+    ['Koszty dodatkowe:', formatPLN(additionalTotal), false]
   );
 
   const totalLines: [string, string, boolean][] = [
