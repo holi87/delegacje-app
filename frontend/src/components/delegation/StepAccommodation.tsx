@@ -136,7 +136,7 @@ function formatNightDate(dateStr: string): string {
 }
 
 export function StepAccommodation() {
-  const { watch, setValue, register, formState: { errors } } =
+  const { watch, setValue, getValues, register, formState: { errors } } =
     useFormContext<DelegationFormValues>();
 
   const departureAt = watch('departureAt');
@@ -220,13 +220,9 @@ export function StepAccommodation() {
     selectedForeignRate?.currency,
   ]);
 
-  const nightTypes = useMemo(
-    () =>
-      nights.map(
-        (_, idx) =>
-          (days?.[idx]?.accommodationType ?? globalAccommodationType) as AccommodationType
-      ),
-    [nights, days, globalAccommodationType]
+  const nightTypes = nights.map(
+    (_, idx) =>
+      (days?.[idx]?.accommodationType ?? globalAccommodationType) as AccommodationType
   );
 
   useEffect(() => {
@@ -355,24 +351,33 @@ export function StepAccommodation() {
 
   const handleNightTypeChange = (nightIndex: number, value: string) => {
     const nextType = value as AccommodationType;
-    setValue(`days.${nightIndex}.accommodationType`, nextType, {
+    const currentDays = [...(getValues('days') || [])];
+    const current = currentDays[nightIndex];
+    const baseDay = current ?? {
+      dayNumber: nightIndex + 1,
+      date: nights[nightIndex] ?? '',
+      breakfastProvided: false,
+      lunchProvided: false,
+      dinnerProvided: false,
+      isForeign: false,
+      accommodationType: 'NONE' as AccommodationType,
+      accommodationCost: null,
+      accommodationReceiptNumber: null,
+    };
+
+    currentDays[nightIndex] = {
+      ...baseDay,
+      accommodationType: nextType,
+      accommodationCost: nextType === 'RECEIPT' ? (baseDay.accommodationCost ?? null) : null,
+      accommodationReceiptNumber:
+        nextType === 'RECEIPT' ? (baseDay.accommodationReceiptNumber ?? null) : null,
+    };
+
+    setValue('days', currentDays, {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
     });
-
-    if (nextType !== 'RECEIPT') {
-      setValue(`days.${nightIndex}.accommodationCost`, null, {
-        shouldDirty: true,
-        shouldTouch: true,
-        shouldValidate: true,
-      });
-      setValue(`days.${nightIndex}.accommodationReceiptNumber`, null, {
-        shouldDirty: true,
-        shouldTouch: true,
-        shouldValidate: true,
-      });
-    }
   };
 
   const toggleBulkNight = (nightIndex: number) => {
