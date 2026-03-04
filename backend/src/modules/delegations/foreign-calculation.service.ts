@@ -15,6 +15,7 @@ interface DayInput {
   dinnerProvided: boolean;
   accommodationType: 'RECEIPT' | 'LUMP_SUM' | 'FREE' | 'NONE';
   accommodationCost: number | null;
+  accommodationReceiptNumber?: string | null;
 }
 
 interface MileageInput {
@@ -88,6 +89,7 @@ interface AccommodationNight {
   amount: number;
   isForeign: boolean;
   overLimit?: boolean;
+  receiptNumber?: string | null;
 }
 
 interface AccommodationResult {
@@ -112,6 +114,7 @@ interface TransportResult {
 interface AdditionalCostItem {
   description: string;
   amount: number;
+  receiptNumber?: string | null;
 }
 
 interface AdditionalCostsResult {
@@ -610,14 +613,26 @@ function calculateForeignAccommodation(
           const maxReceipt = foreignRate.accommodationLimit;
           const amount = round2(Math.min(cost, maxReceipt));
           const overLimit = cost > maxReceipt;
-          nights.push({ type: 'RECEIPT', amount, isForeign: true, overLimit });
+          nights.push({
+            type: 'RECEIPT',
+            amount,
+            isForeign: true,
+            overLimit,
+            receiptNumber: day.accommodationReceiptNumber ?? null,
+          });
           total += amount;
         } else {
           // Domestic: cap at domestic max receipt
           const maxReceipt = domesticRate.accommodationMaxReceipt;
           const amount = round2(Math.min(cost, maxReceipt));
           const overLimit = cost > maxReceipt;
-          nights.push({ type: 'RECEIPT', amount, isForeign: false, overLimit });
+          nights.push({
+            type: 'RECEIPT',
+            amount,
+            isForeign: false,
+            overLimit,
+            receiptNumber: day.accommodationReceiptNumber ?? null,
+          });
           total += amount;
         }
         break;
@@ -715,6 +730,7 @@ function calculateAdditionalCosts(
   const items: AdditionalCostItem[] = costs.map((c) => ({
     description: c.description,
     amount: c.amount,
+    receiptNumber: c.receiptNumber ?? null,
   }));
 
   const total = round2(costs.reduce((sum, c) => sum + c.amount, 0));

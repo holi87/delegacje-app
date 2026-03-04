@@ -88,6 +88,7 @@ export interface DelegationDayInput {
   dinnerProvided: boolean;
   accommodationType: AccommodationType;
   accommodationCost?: string | null;
+  accommodationReceiptNumber?: string | null;
   isForeign?: boolean;
 }
 
@@ -159,7 +160,12 @@ export interface CalculationResult {
     total: string;
   };
   accommodation: {
-    nights: Array<{ type: AccommodationType; amount: string; overLimit?: boolean }>;
+    nights: Array<{
+      type: AccommodationType;
+      amount: string;
+      overLimit?: boolean;
+      receiptNumber?: string | null;
+    }>;
     total: string;
   };
   transport: {
@@ -174,7 +180,7 @@ export interface CalculationResult {
     total: string;
   };
   additionalCosts: {
-    items: Array<{ description: string; amount: string }>;
+    items: Array<{ description: string; amount: string; receiptNumber?: string | null }>;
     total: string;
   };
   summary: {
@@ -203,7 +209,13 @@ export interface ForeignCalculationResult {
     foreignCurrency: string;
   };
   accommodation: {
-    nights: Array<{ type: AccommodationType; amount: string; isForeign?: boolean; overLimit?: boolean }>;
+    nights: Array<{
+      type: AccommodationType;
+      amount: string;
+      isForeign?: boolean;
+      overLimit?: boolean;
+      receiptNumber?: string | null;
+    }>;
     total: string;
   };
   transport: {
@@ -218,7 +230,7 @@ export interface ForeignCalculationResult {
     total: string;
   };
   additionalCosts: {
-    items: Array<{ description: string; amount: string }>;
+    items: Array<{ description: string; amount: string; receiptNumber?: string | null }>;
     total: string;
   };
   summary: {

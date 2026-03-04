@@ -183,7 +183,7 @@ export function StepTransport() {
                 appendReceipt({
                   description: '',
                   amount: '',
-                  receiptNumber: null,
+                  receiptNumber: '',
                 })
               }
             >
@@ -231,11 +231,16 @@ export function StepTransport() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs">Nr rachunku</Label>
+                <Label className="text-xs">Nr dokumentu *</Label>
                 <Input
-                  placeholder="opcjonalnie"
+                  placeholder="np. FV/03/2026/0012"
                   {...register(`transportReceipts.${index}.receiptNumber`)}
                 />
+                {errors.transportReceipts?.[index]?.receiptNumber && (
+                  <p className="text-xs text-destructive">
+                    {errors.transportReceipts[index]?.receiptNumber?.message}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-end">

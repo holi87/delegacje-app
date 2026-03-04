@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -13,6 +15,7 @@ import {
 import { getForeignRates } from '@/api/admin';
 import { formatCurrency } from '@/utils/formatters';
 import { BedDouble, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 import type { DelegationFormValues } from './DelegationWizard';
 import type { AccommodationType } from '../../../../shared/types';
 import type { ForeignDietRate } from '../../../../shared/types';
@@ -43,6 +46,22 @@ function formatAmountByCurrency(amount: number, currency: string): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })} ${currency}`;
+}
+
+function splitAmountEvenly(totalAmount: number, parts: number): number[] {
+  if (parts <= 0) return [];
+
+  const totalCents = Math.round(totalAmount * 100);
+  const base = Math.floor(totalCents / parts);
+  let remainder = totalCents - base * parts;
+
+  const result = Array.from({ length: parts }, () => base);
+  for (let i = 0; i < result.length && remainder > 0; i++) {
+    result[i] += 1;
+    remainder -= 1;
+  }
+
+  return result.map((cents) => round2(cents / 100));
 }
 
 function isForeignNight(
@@ -117,7 +136,7 @@ function formatNightDate(dateStr: string): string {
 }
 
 export function StepAccommodation() {
-  const { watch, setValue, register } =
+  const { watch, setValue, register, formState: { errors } } =
     useFormContext<DelegationFormValues>();
 
   const departureAt = watch('departureAt');
@@ -149,6 +168,11 @@ export function StepAccommodation() {
     () => calculateNights(departureAt, returnAt),
     [departureAt, returnAt]
   );
+
+  const [bulkReceiptAmount, setBulkReceiptAmount] = useState('');
+  const [bulkReceiptNumber, setBulkReceiptNumber] = useState('');
+  const [bulkDistributionMode, setBulkDistributionMode] = useState<'ALL' | 'SELECTED'>('ALL');
+  const [bulkSelectedNights, setBulkSelectedNights] = useState<number[]>([]);
 
   const nightsMeta = useMemo(() => {
     const hasBorderData =
@@ -205,6 +229,16 @@ export function StepAccommodation() {
     [nights, days, globalAccommodationType]
   );
 
+  useEffect(() => {
+    setBulkSelectedNights((prev) => {
+      const filtered = prev.filter((idx) => idx >= 0 && idx < nights.length);
+      if (nights.length > 0 && filtered.length === 0) {
+        return nights.map((_, idx) => idx);
+      }
+      return filtered;
+    });
+  }, [nights.length]);
+
   // Ensure day entries exist for nights and clear accommodation on non-night rows.
   useEffect(() => {
     const currentDays = days || [];
@@ -217,6 +251,8 @@ export function StepAccommodation() {
       const current = updatedDays[idx];
       const nextType = (current?.accommodationType ?? globalAccommodationType) as AccommodationType;
       const nextCost = nextType === 'RECEIPT' ? (current?.accommodationCost ?? null) : null;
+      const nextReceiptNumber =
+        nextType === 'RECEIPT' ? (current?.accommodationReceiptNumber ?? null) : null;
 
       if (!current) {
         updatedDays[idx] = {
@@ -227,6 +263,7 @@ export function StepAccommodation() {
           dinnerProvided: false,
           accommodationType: nextType,
           accommodationCost: nextCost,
+          accommodationReceiptNumber: nextReceiptNumber,
           isForeign: false,
         };
         changed = true;
@@ -235,12 +272,14 @@ export function StepAccommodation() {
 
       if (
         current.accommodationType !== nextType ||
-        (current.accommodationCost ?? null) !== nextCost
+        (current.accommodationCost ?? null) !== nextCost ||
+        (current.accommodationReceiptNumber ?? null) !== nextReceiptNumber
       ) {
         updatedDays[idx] = {
           ...current,
           accommodationType: nextType,
           accommodationCost: nextCost,
+          accommodationReceiptNumber: nextReceiptNumber,
         };
         changed = true;
       }
@@ -249,11 +288,16 @@ export function StepAccommodation() {
     for (let idx = nights.length; idx < updatedDays.length; idx++) {
       const current = updatedDays[idx];
       if (!current) continue;
-      if (current.accommodationType !== 'NONE' || current.accommodationCost != null) {
+      if (
+        current.accommodationType !== 'NONE' ||
+        current.accommodationCost != null ||
+        current.accommodationReceiptNumber != null
+      ) {
         updatedDays[idx] = {
           ...current,
           accommodationType: 'NONE',
           accommodationCost: null,
+          accommodationReceiptNumber: null,
         };
         changed = true;
       }
@@ -283,14 +327,18 @@ export function StepAccommodation() {
       if (!current) continue;
 
       const nextCost = nextType === 'RECEIPT' ? (current.accommodationCost ?? null) : null;
+      const nextReceiptNumber =
+        nextType === 'RECEIPT' ? (current.accommodationReceiptNumber ?? null) : null;
       if (
         current.accommodationType !== nextType ||
-        (current.accommodationCost ?? null) !== nextCost
+        (current.accommodationCost ?? null) !== nextCost ||
+        (current.accommodationReceiptNumber ?? null) !== nextReceiptNumber
       ) {
         updatedDays[idx] = {
           ...current,
           accommodationType: nextType,
           accommodationCost: nextCost,
+          accommodationReceiptNumber: nextReceiptNumber,
         };
         changed = true;
       }
@@ -319,7 +367,66 @@ export function StepAccommodation() {
         shouldTouch: true,
         shouldValidate: true,
       });
+      setValue(`days.${nightIndex}.accommodationReceiptNumber`, null, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
     }
+  };
+
+  const toggleBulkNight = (nightIndex: number) => {
+    setBulkSelectedNights((prev) =>
+      prev.includes(nightIndex)
+        ? prev.filter((idx) => idx !== nightIndex)
+        : [...prev, nightIndex].sort((a, b) => a - b)
+    );
+  };
+
+  const applyBulkReceiptDistribution = () => {
+    const totalAmount = parseAmount(bulkReceiptAmount);
+    const receiptNumber = bulkReceiptNumber.trim();
+
+    if (totalAmount <= 0) {
+      toast.error('Podaj poprawna kwote rachunku do podzialu.');
+      return;
+    }
+    if (!receiptNumber) {
+      toast.error('Podaj numer dokumentu ksiegowego.');
+      return;
+    }
+
+    const targetIndexes =
+      bulkDistributionMode === 'ALL'
+        ? nights.map((_, idx) => idx)
+        : bulkSelectedNights;
+
+    if (targetIndexes.length === 0) {
+      toast.error('Wybierz co najmniej jedna noc do rozliczenia rachunku.');
+      return;
+    }
+
+    const split = splitAmountEvenly(totalAmount, targetIndexes.length);
+    const currentDays = [...(days || [])];
+    const updatedDays = [...currentDays];
+
+    targetIndexes.forEach((nightIndex, splitIndex) => {
+      if (!updatedDays[nightIndex]) return;
+      updatedDays[nightIndex] = {
+        ...updatedDays[nightIndex],
+        accommodationType: 'RECEIPT',
+        accommodationCost: split[splitIndex].toFixed(2),
+        accommodationReceiptNumber: receiptNumber,
+      };
+    });
+
+    setValue('days', updatedDays, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+
+    toast.success('Kwota rachunku zostala rozdzielona na wybrane noce.');
   };
 
   return (
@@ -350,6 +457,87 @@ export function StepAccommodation() {
           </SelectContent>
         </Select>
       </div>
+
+      {globalAccommodationType === 'RECEIPT' && nights.length > 0 && (
+        <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+          <h3 className="text-sm font-medium">
+            Rachunek zbiorczy (automatyczny podzial kwoty)
+          </h3>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Kwota rachunku</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                placeholder="0.00"
+                value={bulkReceiptAmount}
+                onChange={(e) => setBulkReceiptAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs">Numer dokumentu ksiegowego</Label>
+              <Input
+                placeholder="np. FV/03/2026/0012"
+                value={bulkReceiptNumber}
+                onChange={(e) => setBulkReceiptNumber(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Sposob rozdzialu</Label>
+              <Select
+                value={bulkDistributionMode}
+                onValueChange={(value) =>
+                  setBulkDistributionMode(value as 'ALL' | 'SELECTED')
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Rowno na wszystkie noce</SelectItem>
+                  <SelectItem value="SELECTED">Rowno na wybrane noce</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={applyBulkReceiptDistribution}
+              >
+                Rozdziel kwote automatycznie
+              </Button>
+            </div>
+          </div>
+
+          {bulkDistributionMode === 'SELECTED' && (
+            <div className="space-y-2">
+              <Label className="text-xs">Wybierz noce objete rachunkiem</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {nights.map((nightDate, idx) => (
+                  <label
+                    key={`bulk-night-${nightDate}-${idx}`}
+                    className="flex items-center gap-2 rounded border px-2 py-1.5 text-sm"
+                  >
+                    <Checkbox
+                      checked={bulkSelectedNights.includes(idx)}
+                      onCheckedChange={() => toggleBulkNight(idx)}
+                    />
+                    <span>
+                      Noc {idx + 1}: {formatNightDate(nightDate)}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Nights list */}
       {nights.length === 0 ? (
@@ -399,28 +587,50 @@ export function StepAccommodation() {
                 </Select>
 
                 {nightType === 'RECEIPT' && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      placeholder="0.00"
-                      className="w-32"
-                      {...register(`days.${idx}.accommodationCost`, {
-                        onChange: (e) => {
-                          const raw = e.target.value;
-                          const normalized = raw === '' ? null : raw;
-                          setValue(`days.${idx}.accommodationCost`, normalized, {
-                            shouldDirty: true,
-                            shouldTouch: true,
-                            shouldValidate: true,
-                          });
-                        },
-                      })}
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      {nightsMeta[idx]?.currency ?? 'PLN'}
-                    </span>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        placeholder="0.00"
+                        className="w-32"
+                        {...register(`days.${idx}.accommodationCost`, {
+                          onChange: (e) => {
+                            const raw = e.target.value;
+                            const normalized = raw === '' ? null : raw;
+                            setValue(`days.${idx}.accommodationCost`, normalized, {
+                              shouldDirty: true,
+                              shouldTouch: true,
+                              shouldValidate: true,
+                            });
+                          },
+                        })}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {nightsMeta[idx]?.currency ?? 'PLN'}
+                      </span>
+                      <Input
+                        placeholder="Nr dokumentu"
+                        className="w-44"
+                        {...register(`days.${idx}.accommodationReceiptNumber`, {
+                          onChange: (e) => {
+                            const raw = e.target.value;
+                            const normalized = raw === '' ? null : raw;
+                            setValue(
+                              `days.${idx}.accommodationReceiptNumber`,
+                              normalized,
+                              {
+                                shouldDirty: true,
+                                shouldTouch: true,
+                                shouldValidate: true,
+                              }
+                            );
+                          },
+                        })}
+                      />
+                    </div>
+
                     {days?.[idx]?.accommodationCost &&
                       parseAmount(days[idx]?.accommodationCost || '0') >
                         (nightsMeta[idx]?.receiptLimit ?? DOMESTIC_MAX_RECEIPT_AMOUNT) && (
@@ -435,6 +645,16 @@ export function StepAccommodation() {
                           </span>
                         </div>
                       )}
+                    {errors.days?.[idx]?.accommodationCost && (
+                      <p className="text-xs text-destructive">
+                        {errors.days[idx]?.accommodationCost?.message as string}
+                      </p>
+                    )}
+                    {errors.days?.[idx]?.accommodationReceiptNumber && (
+                      <p className="text-xs text-destructive">
+                        {errors.days[idx]?.accommodationReceiptNumber?.message as string}
+                      </p>
+                    )}
                   </div>
                 )}
 

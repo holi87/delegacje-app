@@ -198,6 +198,7 @@ function serializeDelegation(delegation: any) {
       dinnerProvided: d.dinnerProvided,
       accommodationType: d.accommodationType,
       accommodationCost: decimalToString(d.accommodationCost),
+      accommodationReceiptNumber: d.accommodationReceiptNumber ?? null,
       dietBase: decimalToString(d.dietBase),
       dietDeductions: decimalToString(d.dietDeductions),
       dietFinal: decimalToString(d.dietFinal),
@@ -341,6 +342,7 @@ export async function createDelegation(
             accommodationCost: day.accommodationCost != null
               ? new Prisma.Decimal(day.accommodationCost)
               : null,
+            accommodationReceiptNumber: day.accommodationReceiptNumber ?? null,
             isForeign: day.isForeign ?? false,
           })),
         },
@@ -451,6 +453,7 @@ export async function updateDelegation(
           accommodationCost: day.accommodationCost != null
             ? new Prisma.Decimal(day.accommodationCost)
             : null,
+          accommodationReceiptNumber: day.accommodationReceiptNumber ?? null,
           isForeign: day.isForeign ?? false,
         })),
       });
@@ -859,6 +862,7 @@ function buildCalculationInput(delegation: any): CalculationInput {
       dinnerProvided: d.dinnerProvided,
       accommodationType: d.accommodationType,
       accommodationCost: d.accommodationCost ? Number(d.accommodationCost.toString()) : null,
+      accommodationReceiptNumber: d.accommodationReceiptNumber ?? null,
     })),
     mileageDetails: delegation.mileageDetails
       ? {
@@ -903,6 +907,7 @@ function buildForeignCalculationInput(delegation: any): ForeignDelegationInput {
     dinnerProvided: d.dinnerProvided,
     accommodationType: d.accommodationType,
     accommodationCost: d.accommodationCost ? Number(d.accommodationCost.toString()) : null,
+    accommodationReceiptNumber: d.accommodationReceiptNumber ?? null,
   }));
 
   // Backward compatibility: infer foreign segment when old drafts have no isForeign flags.

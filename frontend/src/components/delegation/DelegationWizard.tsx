@@ -27,14 +27,20 @@ import type { ApiCalculationResult } from '@/utils/calculation';
 const transportReceiptSchema = z.object({
   description: z.string().min(1, 'Opis jest wymagany'),
   amount: z.string().min(1, 'Kwota jest wymagana'),
-  receiptNumber: z.string().nullable().optional(),
+  receiptNumber: z
+    .string()
+    .trim()
+    .min(1, 'Numer dokumentu ksiegowego jest wymagany'),
 });
 
 const additionalCostSchema = z.object({
   category: z.string().min(1, 'Kategoria jest wymagana'),
   description: z.string().min(1, 'Opis jest wymagany'),
   amount: z.string().min(1, 'Kwota jest wymagana'),
-  receiptNumber: z.string().nullable().optional(),
+  receiptNumber: z
+    .string()
+    .trim()
+    .min(1, 'Numer dokumentu ksiegowego jest wymagany'),
 });
 
 const delegationDaySchema = z.object({
@@ -45,6 +51,7 @@ const delegationDaySchema = z.object({
   dinnerProvided: z.boolean(),
   accommodationType: z.enum(['RECEIPT', 'LUMP_SUM', 'FREE', 'NONE']),
   accommodationCost: z.string().nullable().optional(),
+  accommodationReceiptNumber: z.string().nullable().optional(),
   isForeign: z.boolean().default(false),
 });
 
@@ -120,7 +127,33 @@ export const delegationFormSchema = z
       message: 'Dla delegacji zagranicznej wymagane sa: kraj, czas przekroczenia granicy',
       path: ['foreignCountry'],
     }
-  );
+  )
+  .superRefine((data, ctx) => {
+    data.days.forEach((day, index) => {
+      if (day.accommodationType !== 'RECEIPT') return;
+
+      const hasAmount =
+        day.accommodationCost != null && String(day.accommodationCost).trim() !== '';
+      if (!hasAmount) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['days', index, 'accommodationCost'],
+          message: 'Kwota noclegu wg rachunku jest wymagana',
+        });
+      }
+
+      const hasReceiptNumber =
+        day.accommodationReceiptNumber != null &&
+        String(day.accommodationReceiptNumber).trim() !== '';
+      if (!hasReceiptNumber) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['days', index, 'accommodationReceiptNumber'],
+          message: 'Numer dokumentu ksiegowego jest wymagany',
+        });
+      }
+    });
+  });
 
 export type DelegationFormValues = z.infer<typeof delegationFormSchema>;
 

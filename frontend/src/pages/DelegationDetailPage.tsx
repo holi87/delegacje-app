@@ -565,6 +565,7 @@ export default function DelegationDetailPage() {
                     <TableRow>
                       <TableHead>Noc</TableHead>
                       <TableHead>Typ</TableHead>
+                      <TableHead>Nr dokumentu</TableHead>
                       <TableHead className="text-right">Kwota</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -582,6 +583,7 @@ export default function DelegationDetailPage() {
                             </Badge>
                           )}
                         </TableCell>
+                        <TableCell>{night.receiptNumber || '---'}</TableCell>
                         <TableCell className="text-right">
                           {formatAccommodationAmount(
                             night.amount,
@@ -593,7 +595,7 @@ export default function DelegationDetailPage() {
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell colSpan={2} className="font-semibold">
+                      <TableCell colSpan={3} className="font-semibold">
                         Suma noclegow
                       </TableCell>
                       <TableCell className="text-right font-semibold">
@@ -644,6 +646,7 @@ export default function DelegationDetailPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Opis</TableHead>
+                      <TableHead>Nr dokumentu</TableHead>
                       <TableHead className="text-right">Kwota</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -651,6 +654,7 @@ export default function DelegationDetailPage() {
                     {calc.transport.receipts.map((r, idx) => (
                       <TableRow key={idx}>
                         <TableCell>{r.description}</TableCell>
+                        <TableCell>{r.receiptNumber || '---'}</TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(r.amount)}
                         </TableCell>
@@ -677,6 +681,7 @@ export default function DelegationDetailPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Opis</TableHead>
+                      <TableHead>Nr dokumentu</TableHead>
                       <TableHead className="text-right">Kwota</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -684,6 +689,7 @@ export default function DelegationDetailPage() {
                     {calc.additionalCosts.items.map((item, idx) => (
                       <TableRow key={idx}>
                         <TableCell>{item.description}</TableCell>
+                        <TableCell>{item.receiptNumber || '---'}</TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(item.amount)}
                         </TableCell>
@@ -692,7 +698,7 @@ export default function DelegationDetailPage() {
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell className="font-semibold">Suma</TableCell>
+                      <TableCell colSpan={2} className="font-semibold">Suma</TableCell>
                       <TableCell className="text-right font-semibold">
                         {formatCurrency(calc.additionalCosts.total)}
                       </TableCell>

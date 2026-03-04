@@ -61,6 +61,10 @@ function buildApiPayload(data: DelegationFormValues) {
         d.accommodationCost,
         `days[${d.dayNumber}].accommodationCost`
       ),
+      accommodationReceiptNumber:
+        d.accommodationType === 'RECEIPT'
+          ? (d.accommodationReceiptNumber?.trim() || null)
+          : null,
       isForeign: d.isForeign ?? false,
     })),
     mileageDetails: data.mileageDetails
@@ -73,13 +77,13 @@ function buildApiPayload(data: DelegationFormValues) {
     transportReceipts: data.transportReceipts.map((r) => ({
       description: r.description,
       amount: parseDecimal(r.amount, 'transportReceipts.amount'),
-      receiptNumber: r.receiptNumber || null,
+      receiptNumber: r.receiptNumber.trim(),
     })),
     additionalCosts: data.additionalCosts.map((c) => ({
       description: c.description,
       category: c.category,
       amount: parseDecimal(c.amount, 'additionalCosts.amount'),
-      receiptNumber: c.receiptNumber || null,
+      receiptNumber: c.receiptNumber.trim(),
     })),
   };
 }

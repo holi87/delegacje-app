@@ -92,6 +92,10 @@ function buildApiPayload(data: DelegationFormValues) {
         d.accommodationCost,
         `days[${d.dayNumber}].accommodationCost`
       ),
+      accommodationReceiptNumber:
+        d.accommodationType === 'RECEIPT'
+          ? (d.accommodationReceiptNumber?.trim() || null)
+          : null,
       isForeign: d.isForeign ?? false,
     })),
     mileageDetails: data.mileageDetails
@@ -104,13 +108,13 @@ function buildApiPayload(data: DelegationFormValues) {
     transportReceipts: data.transportReceipts.map((r) => ({
       description: r.description,
       amount: parseDecimal(r.amount, 'transportReceipts.amount'),
-      receiptNumber: r.receiptNumber || null,
+      receiptNumber: r.receiptNumber.trim(),
     })),
     additionalCosts: data.additionalCosts.map((c) => ({
       description: c.description,
       category: c.category,
       amount: parseDecimal(c.amount, 'additionalCosts.amount'),
-      receiptNumber: c.receiptNumber || null,
+      receiptNumber: c.receiptNumber.trim(),
     })),
   };
 }
@@ -143,6 +147,7 @@ function mapDelegationToFormValues(delegation: any): DelegationFormValues {
         dinnerProvided: !!d.dinnerProvided,
         accommodationType: d.accommodationType ?? 'NONE',
         accommodationCost: d.accommodationCost ?? null,
+        accommodationReceiptNumber: d.accommodationReceiptNumber ?? null,
         isForeign: !!d.isForeign,
       })),
     mileageDetails: delegation.mileageDetails
@@ -155,13 +160,13 @@ function mapDelegationToFormValues(delegation: any): DelegationFormValues {
     transportReceipts: (delegation.transportReceipts ?? []).map((r: any) => ({
       description: r.description ?? '',
       amount: String(r.amount ?? '0'),
-      receiptNumber: r.receiptNumber ?? null,
+      receiptNumber: r.receiptNumber ?? '',
     })),
     additionalCosts: (delegation.additionalCosts ?? []).map((c: any) => ({
       description: c.description ?? '',
       category: c.category ?? '',
       amount: String(c.amount ?? '0'),
-      receiptNumber: c.receiptNumber ?? null,
+      receiptNumber: c.receiptNumber ?? '',
     })),
   };
 }

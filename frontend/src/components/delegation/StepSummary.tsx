@@ -341,6 +341,7 @@ export function StepSummary({
                 <TableRow>
                   <TableHead>Noc</TableHead>
                   <TableHead>Typ</TableHead>
+                  <TableHead>Nr dokumentu</TableHead>
                   <TableHead className="text-right">Kwota</TableHead>
                 </TableRow>
               </TableHeader>
@@ -358,6 +359,7 @@ export function StepSummary({
                         </Badge>
                       )}
                     </TableCell>
+                    <TableCell>{night.receiptNumber || '---'}</TableCell>
                     <TableCell className="text-right">
                       {formatAccommodationAmount(night.amount, !!night.isForeign)}
                     </TableCell>
@@ -366,7 +368,7 @@ export function StepSummary({
               </TableBody>
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={2} className="font-semibold">
+                  <TableCell colSpan={3} className="font-semibold">
                     Suma noclegow
                   </TableCell>
                   <TableCell className="text-right font-semibold">
@@ -422,6 +424,7 @@ export function StepSummary({
               <TableHeader>
                 <TableRow>
                   <TableHead>Opis</TableHead>
+                  <TableHead>Nr dokumentu</TableHead>
                   <TableHead className="text-right">Kwota</TableHead>
                 </TableRow>
               </TableHeader>
@@ -429,6 +432,7 @@ export function StepSummary({
                 {calc.transport.receipts.map((r, idx) => (
                   <TableRow key={idx}>
                     <TableCell>{r.description}</TableCell>
+                    <TableCell>{r.receiptNumber || '---'}</TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(r.amount)}
                     </TableCell>
@@ -458,6 +462,7 @@ export function StepSummary({
               <TableHeader>
                 <TableRow>
                   <TableHead>Opis</TableHead>
+                  <TableHead>Nr dokumentu</TableHead>
                   <TableHead className="text-right">Kwota</TableHead>
                 </TableRow>
               </TableHeader>
@@ -465,6 +470,7 @@ export function StepSummary({
                 {calc.additionalCosts.items.map((item, idx) => (
                   <TableRow key={idx}>
                     <TableCell>{item.description}</TableCell>
+                    <TableCell>{item.receiptNumber || '---'}</TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(item.amount)}
                     </TableCell>
@@ -473,7 +479,7 @@ export function StepSummary({
               </TableBody>
               <TableFooter>
                 <TableRow>
-                  <TableCell className="font-semibold">
+                  <TableCell colSpan={2} className="font-semibold">
                     Suma kosztow dodatkowych
                   </TableCell>
                   <TableCell className="text-right font-semibold">
@@ -597,6 +603,10 @@ function buildApiPayload(data: DelegationFormValues) {
         d.accommodationCost,
         `days[${d.dayNumber}].accommodationCost`
       ),
+      accommodationReceiptNumber:
+        d.accommodationType === 'RECEIPT'
+          ? (d.accommodationReceiptNumber?.trim() || null)
+          : null,
       isForeign: d.isForeign ?? false,
     })),
     mileageDetails: data.mileageDetails
@@ -609,13 +619,13 @@ function buildApiPayload(data: DelegationFormValues) {
     transportReceipts: data.transportReceipts.map((r) => ({
       description: r.description,
       amount: parseDecimal(r.amount, 'transportReceipts.amount'),
-      receiptNumber: r.receiptNumber || null,
+      receiptNumber: r.receiptNumber.trim(),
     })),
     additionalCosts: data.additionalCosts.map((c) => ({
       description: c.description,
       category: c.category,
       amount: parseDecimal(c.amount, 'additionalCosts.amount'),
-      receiptNumber: c.receiptNumber || null,
+      receiptNumber: c.receiptNumber.trim(),
     })),
   };
 }

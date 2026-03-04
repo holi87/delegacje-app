@@ -25,6 +25,7 @@ interface DelegationDayData {
   dinnerProvided: boolean;
   accommodationType: string;
   accommodationCost: Decimal | null;
+  accommodationReceiptNumber: string | null;
   dietBase: Decimal | null;
   dietDeductions: Decimal | null;
   dietFinal: Decimal | null;
@@ -43,11 +44,13 @@ interface MileageData {
 interface TransportReceiptData {
   description: string;
   amount: Decimal;
+  receiptNumber: string | null;
 }
 
 interface AdditionalCostData {
   description: string;
   amount: Decimal;
+  receiptNumber: string | null;
 }
 
 interface CompanyData {
@@ -295,7 +298,7 @@ const COLOR_GRAY = '#666666';
 const COLOR_LIGHT_GRAY = '#CCCCCC';
 const COLOR_HEADER_BG = '#F0F0F0';
 const APP_NAME = 'Delegacje-APP';
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 const APP_REPOSITORY_URL = 'https://github.com/holi87/delegacje-app';
 
 // =====================
@@ -780,8 +783,9 @@ function renderAccommodationTable(
   const columns: TableColumn[] = [
     { header: 'Nr', width: 30, align: 'center' },
     { header: 'Data', width: 80, align: 'center' },
-    { header: 'Rodzaj', width: 200, align: 'left' },
-    { header: 'Kwota', width: CONTENT_WIDTH - 30 - 80 - 200, align: 'right' },
+    { header: 'Rodzaj', width: 140, align: 'left' },
+    { header: 'Nr dokumentu', width: 120, align: 'left' },
+    { header: 'Kwota', width: CONTENT_WIDTH - 30 - 80 - 140 - 120, align: 'right' },
   ];
 
   const rows: TableRow[] = [];
@@ -805,6 +809,7 @@ function renderAccommodationTable(
         idx.toString(),
         formatDate(night.date),
         accommodationTypeLabel(night.accommodationType),
+        night.accommodationReceiptNumber ?? '\u2013',
         formatAmountByCurrency(cost, nightCurrency),
       ],
     });
@@ -814,6 +819,7 @@ function renderAccommodationTable(
   // Totals row
   rows.push({
     cells: [
+      '',
       '',
       '',
       'RAZEM',
@@ -911,8 +917,9 @@ function renderTransportSection(
 
     const columns: TableColumn[] = [
       { header: 'Nr', width: 30, align: 'center' },
-      { header: 'Opis', width: CONTENT_WIDTH - 30 - 120, align: 'left' },
-      { header: 'Kwota', width: 120, align: 'right' },
+      { header: 'Opis', width: CONTENT_WIDTH - 30 - 120 - 130, align: 'left' },
+      { header: 'Nr dokumentu', width: 120, align: 'left' },
+      { header: 'Kwota', width: 130, align: 'right' },
     ];
 
     const rows: TableRow[] = [];
@@ -923,12 +930,17 @@ function renderTransportSection(
       const amount = d2n(r.amount);
       receiptsTotal += amount;
       rows.push({
-        cells: [(i + 1).toString(), r.description, formatPLN(amount)],
+        cells: [
+          (i + 1).toString(),
+          r.description,
+          r.receiptNumber ?? '\u2013',
+          formatPLN(amount),
+        ],
       });
     }
 
     rows.push({
-      cells: ['', 'RAZEM', formatPLN(receiptsTotal)],
+      cells: ['', 'RAZEM', '', formatPLN(receiptsTotal)],
       bold: true,
       separator: true,
     });
@@ -973,8 +985,9 @@ function renderAdditionalCosts(
 
   const columns: TableColumn[] = [
     { header: 'Nr', width: 30, align: 'center' },
-    { header: 'Opis', width: CONTENT_WIDTH - 30 - 120, align: 'left' },
-    { header: 'Kwota', width: 120, align: 'right' },
+    { header: 'Opis', width: CONTENT_WIDTH - 30 - 120 - 130, align: 'left' },
+    { header: 'Nr dokumentu', width: 120, align: 'left' },
+    { header: 'Kwota', width: 130, align: 'right' },
   ];
 
   const rows: TableRow[] = [];
@@ -985,12 +998,17 @@ function renderAdditionalCosts(
     const amount = d2n(c.amount);
     total += amount;
     rows.push({
-      cells: [(i + 1).toString(), c.description, formatPLN(amount)],
+      cells: [
+        (i + 1).toString(),
+        c.description,
+        c.receiptNumber ?? '\u2013',
+        formatPLN(amount),
+      ],
     });
   }
 
   rows.push({
-    cells: ['', 'RAZEM', formatPLN(total)],
+    cells: ['', 'RAZEM', '', formatPLN(total)],
     bold: true,
     separator: true,
   });

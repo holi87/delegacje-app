@@ -14,6 +14,11 @@ const delegationNumberSchema = z
   .min(1, 'Numer delegacji nie moze byc pusty')
   .max(64, 'Numer delegacji moze miec maksymalnie 64 znaki')
   .regex(/^[A-Za-z0-9/_\-\.]+$/, 'Numer delegacji zawiera niedozwolone znaki');
+const documentNumberSchema = z
+  .string()
+  .trim()
+  .min(1, 'Numer dokumentu ksiegowego jest wymagany')
+  .max(64, 'Numer dokumentu ksiegowego moze miec maksymalnie 64 znaki');
 
 // =====================
 // Sub-schemas
@@ -30,6 +35,7 @@ const delegationDaySchema = z.object({
     .union([z.number().min(0, 'Kwota noclegu nie może być ujemna'), z.null()])
     .optional()
     .default(null),
+  accommodationReceiptNumber: documentNumberSchema.nullable().optional().default(null),
   isForeign: z.boolean().default(false),
 });
 
@@ -42,14 +48,14 @@ const mileageDetailsSchema = z.object({
 const transportReceiptSchema = z.object({
   description: z.string().min(1, 'Opis biletu jest wymagany'),
   amount: z.number().min(0, 'Kwota biletu nie może być ujemna'),
-  receiptNumber: z.string().nullable().optional(),
+  receiptNumber: documentNumberSchema,
 });
 
 const additionalCostSchema = z.object({
   description: z.string().min(1, 'Opis kosztu jest wymagany'),
   category: z.string().min(1, 'Kategoria kosztu jest wymagana'),
   amount: z.number().min(0, 'Kwota kosztu nie może być ujemna'),
-  receiptNumber: z.string().nullable().optional(),
+  receiptNumber: documentNumberSchema,
 });
 
 // =====================
@@ -110,6 +116,17 @@ export const createDelegationSchema = z
       message: 'Dla delegacji zagranicznej wymagane są: kraj, czas przekroczenia granicy (wyjazd i powrót)',
       path: ['foreignCountry'],
     }
+  )
+  .refine(
+    (data) =>
+      data.days.every((day) => {
+        if (day.accommodationType !== 'RECEIPT') return true;
+        return day.accommodationCost != null && !!day.accommodationReceiptNumber?.trim();
+      }),
+    {
+      message: 'Dla noclegu wg rachunku wymagane są: kwota oraz numer dokumentu księgowego',
+      path: ['days'],
+    }
   );
 
 export type CreateDelegationInput = z.infer<typeof createDelegationSchema>;
@@ -149,6 +166,18 @@ export const updateDelegationSchema = z
     {
       message: 'Data powrotu musi być późniejsza niż data wyjazdu',
       path: ['returnAt'],
+    }
+  )
+  .refine(
+    (data) =>
+      !data.days ||
+      data.days.every((day) => {
+        if (day.accommodationType !== 'RECEIPT') return true;
+        return day.accommodationCost != null && !!day.accommodationReceiptNumber?.trim();
+      }),
+    {
+      message: 'Dla noclegu wg rachunku wymagane są: kwota oraz numer dokumentu księgowego',
+      path: ['days'],
     }
   );
 

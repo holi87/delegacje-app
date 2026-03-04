@@ -2,7 +2,7 @@
 
 Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i wspólników spółki. Zgodna z polskim prawem.
 
-**Aktualna wersja:** `1.2.1` (2026-03-04)
+**Aktualna wersja:** `1.3.0` (2026-03-04)
 
 ## Funkcje
 
@@ -235,6 +235,22 @@ Własnościowa / wewnętrzna. Do użytku w ramach spółki.
 ---
 
 ## Changelog
+
+### [1.3.0] - 2026-03-04
+- Noclegi (duza przebudowa UX):
+  - Per-noc wybór typu noclegu (`Brak` / `Ryczałt` / `Wg rachunku` / `Bezpłatnie`)
+  - Globalny wybór typu działa jako szybkie „zastosuj do wszystkich”
+  - Dodane narzędzie do automatycznego podziału jednego rachunku noclegowego:
+    - równy podział kwoty na wszystkie noce
+    - równy podział kwoty na wybrane noce
+  - Dla noclegu `Wg rachunku` obsługa numeru dokumentu księgowego per noc
+- Numery dokumentów księgowych:
+  - Wymagane dla wszystkich biletów i rachunków (transport, koszty dodatkowe, noclegi `Wg rachunku`)
+  - Wyświetlane w podsumowaniu i szczegółach delegacji
+  - Dodane do PDF (tabele: noclegi, bilety/rachunki, koszty dodatkowe)
+- Backend/DB:
+  - Rozszerzenie modelu `delegation_days` o `accommodation_receipt_number`
+  - Walidacje backendowe wymuszające numer dokumentu tam, gdzie wymagany
 
 ### [1.2.1] - 2026-03-04
 - Noclegi (wizard):

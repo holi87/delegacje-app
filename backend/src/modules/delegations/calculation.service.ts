@@ -14,6 +14,7 @@ interface DayInput {
   dinnerProvided: boolean;
   accommodationType: 'RECEIPT' | 'LUMP_SUM' | 'FREE' | 'NONE';
   accommodationCost: number | null;
+  accommodationReceiptNumber?: string | null;
 }
 
 interface MileageInput {
@@ -74,6 +75,7 @@ interface AccommodationNight {
   type: string;
   amount: number;
   overLimit?: boolean;
+  receiptNumber?: string | null;
 }
 
 interface AccommodationResult {
@@ -98,6 +100,7 @@ interface TransportResult {
 interface AdditionalCostItem {
   description: string;
   amount: number;
+  receiptNumber?: string | null;
 }
 
 interface AdditionalCostsResult {
@@ -381,7 +384,12 @@ function calculateAccommodation(
         // Cap at max receipt limit; flag if over limit (needs admin approval)
         const amount = round2(Math.min(cost, rate.accommodationMaxReceipt));
         const overLimit = cost > rate.accommodationMaxReceipt;
-        nights.push({ type: 'RECEIPT', amount, overLimit });
+        nights.push({
+          type: 'RECEIPT',
+          amount,
+          overLimit,
+          receiptNumber: day.accommodationReceiptNumber ?? null,
+        });
         total += amount;
         break;
       }
@@ -470,6 +478,7 @@ function calculateAdditionalCosts(
   const items: AdditionalCostItem[] = costs.map((c) => ({
     description: c.description,
     amount: c.amount,
+    receiptNumber: c.receiptNumber ?? null,
   }));
 
   const total = round2(costs.reduce((sum, c) => sum + c.amount, 0));

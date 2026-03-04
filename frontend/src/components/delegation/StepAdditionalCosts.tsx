@@ -53,7 +53,7 @@ export function StepAdditionalCosts() {
               category: 'other',
               description: '',
               amount: '',
-              receiptNumber: null,
+              receiptNumber: '',
             })
           }
         >
@@ -148,11 +148,16 @@ export function StepAdditionalCosts() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs">Nr rachunku</Label>
+              <Label className="text-xs">Nr dokumentu *</Label>
               <Input
-                placeholder="opcjonalnie"
+                placeholder="np. FV/03/2026/0044"
                 {...register(`additionalCosts.${index}.receiptNumber`)}
               />
+              {errors.additionalCosts?.[index]?.receiptNumber && (
+                <p className="text-xs text-destructive">
+                  {errors.additionalCosts[index]?.receiptNumber?.message}
+                </p>
+              )}
             </div>
           </div>
         </div>

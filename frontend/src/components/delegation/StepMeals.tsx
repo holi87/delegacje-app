@@ -168,6 +168,10 @@ export function StepMeals() {
       const isAccommodationNight = idx < nightsCount;
       const resolvedAccommodationType = existing?.accommodationType
         ?? (isAccommodationNight ? globalAccommodationType : 'NONE');
+      const resolvedAccommodationReceiptNumber =
+        resolvedAccommodationType === 'RECEIPT'
+          ? (existing?.accommodationReceiptNumber ?? null)
+          : null;
 
       return {
         dayNumber: dd.dayNumber,
@@ -180,6 +184,7 @@ export function StepMeals() {
           resolvedAccommodationType === 'RECEIPT'
             ? (existing?.accommodationCost ?? null)
             : null,
+        accommodationReceiptNumber: resolvedAccommodationReceiptNumber,
         isForeign: delegationType === 'FOREIGN' ? autoForeign : false,
       };
     });
@@ -193,7 +198,9 @@ export function StepMeals() {
           d.date !== currentDays[i]?.date ||
           d.isForeign !== currentDays[i]?.isForeign ||
           d.accommodationType !== currentDays[i]?.accommodationType ||
-          (d.accommodationCost ?? null) !== (currentDays[i]?.accommodationCost ?? null)
+          (d.accommodationCost ?? null) !== (currentDays[i]?.accommodationCost ?? null) ||
+          (d.accommodationReceiptNumber ?? null) !==
+            (currentDays[i]?.accommodationReceiptNumber ?? null)
       )
     ) {
       setValue('days', newDays);
