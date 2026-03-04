@@ -282,6 +282,7 @@ const FONT_SIZE_TITLE = 13;
 const FONT_SIZE_SUBTITLE = 10;
 const FONT_SIZE_NORMAL = 9;
 const FONT_SIZE_SMALL = 7.5;
+const FONT_SIZE_FOOTER_META = 6.5;
 const FONT_SIZE_TABLE = 8;
 
 const LINE_HEIGHT = 14;
@@ -294,7 +295,7 @@ const COLOR_GRAY = '#666666';
 const COLOR_LIGHT_GRAY = '#CCCCCC';
 const COLOR_HEADER_BG = '#F0F0F0';
 const APP_NAME = 'Delegacje-APP';
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const APP_REPOSITORY_URL = 'https://github.com/holi87/delegacje-app';
 
 // =====================
@@ -1158,7 +1159,7 @@ function renderFooter(
   doc: InstanceType<typeof PDFDocument>,
   _y: number
 ): void {
-  const footerY = PAGE_HEIGHT - MARGIN - 20;
+  const footerY = PAGE_HEIGHT - MARGIN - 24;
 
   doc.font(FONT_NORMAL).fontSize(FONT_SIZE_SMALL).fillColor(COLOR_GRAY);
 
@@ -1169,12 +1170,21 @@ function renderFooter(
   doc.text(
     'Podstawa prawna: Rozporządzenie MPiPS z 25.10.2022 r. (Dz.U. 2022 poz. 2302)',
     MARGIN,
-    footerY + 10
+    footerY + 9,
+    {
+      width: CONTENT_WIDTH,
+      lineBreak: false,
+    }
   );
+  doc.font(FONT_NORMAL).fontSize(FONT_SIZE_FOOTER_META).fillColor(COLOR_GRAY);
   doc.text(
     `Wygenerowano w ${APP_NAME} v${APP_VERSION} / ${APP_REPOSITORY_URL}`,
     MARGIN,
-    footerY + 20
+    footerY + 18,
+    {
+      width: CONTENT_WIDTH,
+      lineBreak: false,
+    }
   );
 }
 

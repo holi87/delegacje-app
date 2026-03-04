@@ -2,7 +2,7 @@
 
 Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i wspólników spółki. Zgodna z polskim prawem.
 
-**Aktualna wersja:** `1.2.0` (2026-03-04)
+**Aktualna wersja:** `1.2.1` (2026-03-04)
 
 ## Funkcje
 
@@ -235,6 +235,14 @@ Własnościowa / wewnętrzna. Do użytku w ramach spółki.
 ---
 
 ## Changelog
+
+### [1.2.1] - 2026-03-04
+- Noclegi (wizard):
+  - Dodany wybór typu noclegu osobno dla każdej nocy (`Brak` / `Ryczałt` / `Wg rachunku` / `Bezpłatnie`)
+  - Górny wybór typu noclegu działa jako „zastosuj do wszystkich nocy”
+  - Poprawiona synchronizacja danych noclegów, aby nie gubić wyliczeń przy pierwszym przejściu do podsumowania
+- PDF:
+  - Stopka z metką aplikacji (`Delegacje-APP v1.2.1 / repo`) renderowana w tej samej stronie dokumentu (bez wypychania na kolejną stronę)
 
 ### [1.2.0] - 2026-03-04
 - Personalizacja i identyfikacja dokumentów:

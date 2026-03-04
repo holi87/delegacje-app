@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { useFormContext, Controller } from 'react-hook-form';
+import { useFormContext } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -117,7 +117,7 @@ function formatNightDate(dateStr: string): string {
 }
 
 export function StepAccommodation() {
-  const { watch, setValue, control, register, formState: { errors } } =
+  const { watch, setValue, register } =
     useFormContext<DelegationFormValues>();
 
   const departureAt = watch('departureAt');
@@ -128,6 +128,7 @@ export function StepAccommodation() {
   const foreignCountry = watch('foreignCountry');
   const borderCrossingOut = watch('borderCrossingOut');
   const borderCrossingIn = watch('borderCrossingIn');
+  const globalAccommodationType = accommodationType ?? 'NONE';
 
   const { data: foreignRatesData } = useQuery({
     queryKey: ['admin', 'rates', 'foreign'],
@@ -195,37 +196,130 @@ export function StepAccommodation() {
     selectedForeignRate?.currency,
   ]);
 
-  // Sync accommodation type to days when global type changes or nights change
+  const nightTypes = useMemo(
+    () =>
+      nights.map(
+        (_, idx) =>
+          (days?.[idx]?.accommodationType ?? globalAccommodationType) as AccommodationType
+      ),
+    [nights, days, globalAccommodationType]
+  );
+
+  // Ensure day entries exist for nights and clear accommodation on non-night rows.
   useEffect(() => {
-    if (nights.length === 0) return;
-
     const currentDays = days || [];
+    if (currentDays.length === 0 && nights.length === 0) return;
+
     const updatedDays = [...currentDays];
+    let changed = false;
 
-    // Ensure we have entries for all nights in days array (for accommodation tracking)
-    nights.forEach((nightDate, idx) => {
-      const dayIndex = idx; // Accommodation night i maps to day i
-      if (dayIndex < updatedDays.length) {
-        // Update existing day's accommodation type
-        updatedDays[dayIndex] = {
-          ...updatedDays[dayIndex],
-          accommodationType: accommodationType as AccommodationType,
-          accommodationCost:
-            accommodationType === 'RECEIPT'
-              ? updatedDays[dayIndex]?.accommodationCost ?? ''
-              : null,
+    for (let idx = 0; idx < nights.length; idx++) {
+      const current = updatedDays[idx];
+      const nextType = (current?.accommodationType ?? globalAccommodationType) as AccommodationType;
+      const nextCost = nextType === 'RECEIPT' ? (current?.accommodationCost ?? null) : null;
+
+      if (!current) {
+        updatedDays[idx] = {
+          dayNumber: idx + 1,
+          date: nights[idx],
+          breakfastProvided: false,
+          lunchProvided: false,
+          dinnerProvided: false,
+          accommodationType: nextType,
+          accommodationCost: nextCost,
+          isForeign: false,
         };
+        changed = true;
+        continue;
       }
-    });
 
-    // Only update if days actually changed
-    if (JSON.stringify(updatedDays) !== JSON.stringify(currentDays)) {
+      if (
+        current.accommodationType !== nextType ||
+        (current.accommodationCost ?? null) !== nextCost
+      ) {
+        updatedDays[idx] = {
+          ...current,
+          accommodationType: nextType,
+          accommodationCost: nextCost,
+        };
+        changed = true;
+      }
+    }
+
+    for (let idx = nights.length; idx < updatedDays.length; idx++) {
+      const current = updatedDays[idx];
+      if (!current) continue;
+      if (current.accommodationType !== 'NONE' || current.accommodationCost != null) {
+        updatedDays[idx] = {
+          ...current,
+          accommodationType: 'NONE',
+          accommodationCost: null,
+        };
+        changed = true;
+      }
+    }
+
+    if (changed) {
       setValue('days', updatedDays);
     }
-  }, [accommodationType, nights.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [days, nights, globalAccommodationType, setValue]);
 
   const handleAccommodationTypeChange = (value: string) => {
-    setValue('accommodationType', value as AccommodationType);
+    const nextType = value as AccommodationType;
+    setValue('accommodationType', nextType, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+
+    const currentDays = days || [];
+    if (currentDays.length === 0 || nights.length === 0) return;
+
+    const updatedDays = [...currentDays];
+    let changed = false;
+
+    for (let idx = 0; idx < nights.length && idx < updatedDays.length; idx++) {
+      const current = updatedDays[idx];
+      if (!current) continue;
+
+      const nextCost = nextType === 'RECEIPT' ? (current.accommodationCost ?? null) : null;
+      if (
+        current.accommodationType !== nextType ||
+        (current.accommodationCost ?? null) !== nextCost
+      ) {
+        updatedDays[idx] = {
+          ...current,
+          accommodationType: nextType,
+          accommodationCost: nextCost,
+        };
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setValue('days', updatedDays, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
+    }
+  };
+
+  const handleNightTypeChange = (nightIndex: number, value: string) => {
+    const nextType = value as AccommodationType;
+    setValue(`days.${nightIndex}.accommodationType`, nextType, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+
+    if (nextType !== 'RECEIPT') {
+      setValue(`days.${nightIndex}.accommodationCost`, null, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
+    }
   };
 
   return (
@@ -233,37 +327,28 @@ export function StepAccommodation() {
       <div>
         <h2 className="text-lg font-semibold">Noclegi</h2>
         <p className="text-sm text-muted-foreground">
-          Okresl typ noclegu i podaj koszty.
+          Wybierz typ dla każdej nocy. Górny wybór zastosuje jeden typ do wszystkich.
         </p>
       </div>
 
       {/* Global accommodation type */}
       <div className="space-y-2">
-        <Label>Typ noclegu *</Label>
-        <Controller
-          control={control}
-          name="accommodationType"
-          render={({ field }) => (
-            <Select
-              value={field.value}
-              onValueChange={(val) => {
-                field.onChange(val);
-                handleAccommodationTypeChange(val);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Wybierz typ noclegu" />
-              </SelectTrigger>
-              <SelectContent>
-                {ACCOMMODATION_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
+        <Label>Typ noclegu (zastosuj do wszystkich) *</Label>
+        <Select
+          value={globalAccommodationType}
+          onValueChange={handleAccommodationTypeChange}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Wybierz typ noclegu" />
+          </SelectTrigger>
+          <SelectContent>
+            {ACCOMMODATION_TYPES.map((t) => (
+              <SelectItem key={t.value} value={t.value}>
+                {t.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Nights list */}
@@ -281,11 +366,14 @@ export function StepAccommodation() {
             Noclegi ({nights.length})
           </h3>
 
-          {nights.map((nightDate, idx) => (
-            <div
-              key={nightDate}
-              className="flex items-center gap-4 rounded-lg border p-3"
-            >
+          {nights.map((nightDate, idx) => {
+            const nightType = nightTypes[idx] ?? globalAccommodationType;
+
+            return (
+              <div
+                key={nightDate}
+                className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center"
+              >
               <div className="flex items-center gap-2">
                 <BedDouble className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">
@@ -293,22 +381,48 @@ export function StepAccommodation() {
                 </span>
               </div>
 
-              <div className="ml-auto flex items-center gap-2">
-                {accommodationType === 'RECEIPT' && (
-                  <div className="flex items-center gap-2">
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <Select
+                  value={nightType}
+                  onValueChange={(val) => handleNightTypeChange(idx, val)}
+                >
+                  <SelectTrigger className="w-[190px]">
+                    <SelectValue placeholder="Typ noclegu" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACCOMMODATION_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {nightType === 'RECEIPT' && (
+                  <div className="flex flex-wrap items-center gap-2">
                     <Input
                       type="number"
                       step="0.01"
                       min={0}
                       placeholder="0.00"
                       className="w-32"
-                      {...register(`days.${idx}.accommodationCost`)}
+                      {...register(`days.${idx}.accommodationCost`, {
+                        onChange: (e) => {
+                          const raw = e.target.value;
+                          const normalized = raw === '' ? null : raw;
+                          setValue(`days.${idx}.accommodationCost`, normalized, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          });
+                        },
+                      })}
                     />
                     <span className="text-xs text-muted-foreground">
                       {nightsMeta[idx]?.currency ?? 'PLN'}
                     </span>
-                    {days[idx]?.accommodationCost &&
-                      parseAmount(days[idx].accommodationCost || '0') >
+                    {days?.[idx]?.accommodationCost &&
+                      parseAmount(days[idx]?.accommodationCost || '0') >
                         (nightsMeta[idx]?.receiptLimit ?? DOMESTIC_MAX_RECEIPT_AMOUNT) && (
                         <div className="flex items-center gap-1 text-xs text-amber-600">
                           <AlertTriangle className="h-3.5 w-3.5" />
@@ -324,7 +438,7 @@ export function StepAccommodation() {
                   </div>
                 )}
 
-                {accommodationType === 'LUMP_SUM' && (
+                {nightType === 'LUMP_SUM' && (
                   <span className="text-sm font-medium">
                     {formatAmountByCurrency(
                       nightsMeta[idx]?.lumpSumAmount ?? DOMESTIC_LUMP_SUM_AMOUNT,
@@ -333,39 +447,40 @@ export function StepAccommodation() {
                   </span>
                 )}
 
-                {accommodationType === 'FREE' && (
+                {nightType === 'FREE' && (
                   <span className="text-sm text-muted-foreground">
                     Bezplatnie
                   </span>
                 )}
 
-                {accommodationType === 'NONE' && (
+                {nightType === 'NONE' && (
                   <span className="text-sm text-muted-foreground">
                     Brak noclegu
                   </span>
                 )}
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
 
           {/* Summary for lump sum */}
-          {accommodationType === 'LUMP_SUM' && nights.length > 0 && (
+          {nightTypes.some((t) => t === 'LUMP_SUM') && nights.length > 0 && (
             <div className="rounded-lg bg-muted/50 p-3 text-sm">
               <span className="text-muted-foreground">Ryczalt za noclegi: </span>
               <span className="font-semibold">
-                {nightsMeta.filter((n) => !n.isForeign).length > 0 && (
+                {nightsMeta.filter((n, idx) => !n.isForeign && nightTypes[idx] === 'LUMP_SUM').length > 0 && (
                   <span>
                     krajowy:{' '}
-                    {nightsMeta.filter((n) => !n.isForeign).length} x{' '}
+                    {nightsMeta.filter((n, idx) => !n.isForeign && nightTypes[idx] === 'LUMP_SUM').length} x{' '}
                     {formatCurrency(DOMESTIC_LUMP_SUM_AMOUNT)}
                   </span>
                 )}
-                {nightsMeta.some((n) => n.isForeign) &&
+                {nightsMeta.some((n, idx) => n.isForeign && nightTypes[idx] === 'LUMP_SUM') &&
                   foreignAccommodationLimit != null &&
                   selectedForeignRate?.currency && (
                     <span className="ml-2">
                       zagraniczny:{' '}
-                      {nightsMeta.filter((n) => n.isForeign).length} x{' '}
+                      {nightsMeta.filter((n, idx) => n.isForeign && nightTypes[idx] === 'LUMP_SUM').length} x{' '}
                       {formatAmountByCurrency(
                         round2(foreignAccommodationLimit * 0.25),
                         selectedForeignRate.currency
