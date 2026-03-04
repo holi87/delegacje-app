@@ -469,7 +469,7 @@ function renderHeader(
   const rightX = MARGIN + colWidth;
 
   doc.font(FONT_BOLD).fontSize(FONT_SIZE_SMALL).fillColor(COLOR_GRAY);
-  doc.text('Dane spółki:', leftX, y);
+  doc.text('Dane delegującego:', leftX, y);
   doc.text('Dane delegowanego:', rightX, y);
   y += 12;
 
