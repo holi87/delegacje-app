@@ -20,11 +20,18 @@ import type { DelegationFormValues } from './DelegationWizard';
 import type { AccommodationType } from '../../../../shared/types';
 import type { ForeignDietRate } from '../../../../shared/types';
 
-const ACCOMMODATION_TYPES = [
+type GlobalAccommodationType = AccommodationType | 'MIXED';
+
+const NIGHT_ACCOMMODATION_TYPES = [
   { value: 'RECEIPT', label: 'Wg rachunku' },
   { value: 'LUMP_SUM', label: 'Ryczalt' },
   { value: 'FREE', label: 'Zapewniony bezplatnie' },
   { value: 'NONE', label: 'Brak' },
+] as const;
+
+const GLOBAL_ACCOMMODATION_TYPES = [
+  ...NIGHT_ACCOMMODATION_TYPES,
+  { value: 'MIXED', label: 'Mieszany (bez nadpisywania)' },
 ] as const;
 
 const DOMESTIC_LUMP_SUM_AMOUNT = 67.5; // 150% of 45 zl diet
@@ -147,7 +154,9 @@ export function StepAccommodation() {
   const foreignCountry = watch('foreignCountry');
   const borderCrossingOut = watch('borderCrossingOut');
   const borderCrossingIn = watch('borderCrossingIn');
-  const globalAccommodationType = accommodationType ?? 'NONE';
+  const globalAccommodationType = (accommodationType ?? 'NONE') as GlobalAccommodationType;
+  const defaultNightType: AccommodationType =
+    globalAccommodationType === 'MIXED' ? 'NONE' : globalAccommodationType;
 
   const { data: foreignRatesData } = useQuery({
     queryKey: ['admin', 'rates', 'foreign'],
@@ -222,7 +231,7 @@ export function StepAccommodation() {
 
   const nightTypes = nights.map(
     (_, idx) =>
-      (days?.[idx]?.accommodationType ?? globalAccommodationType) as AccommodationType
+      (days?.[idx]?.accommodationType ?? defaultNightType) as AccommodationType
   );
 
   useEffect(() => {
@@ -245,7 +254,7 @@ export function StepAccommodation() {
 
     for (let idx = 0; idx < nights.length; idx++) {
       const current = updatedDays[idx];
-      const nextType = (current?.accommodationType ?? globalAccommodationType) as AccommodationType;
+      const nextType = (current?.accommodationType ?? defaultNightType) as AccommodationType;
       const nextCost = nextType === 'RECEIPT' ? (current?.accommodationCost ?? null) : null;
       const nextReceiptNumber =
         nextType === 'RECEIPT' ? (current?.accommodationReceiptNumber ?? null) : null;
@@ -302,15 +311,19 @@ export function StepAccommodation() {
     if (changed) {
       setValue('days', updatedDays);
     }
-  }, [days, nights, globalAccommodationType, setValue]);
+  }, [days, nights, defaultNightType, setValue]);
 
   const handleAccommodationTypeChange = (value: string) => {
-    const nextType = value as AccommodationType;
+    const nextType = value as GlobalAccommodationType;
     setValue('accommodationType', nextType, {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
     });
+
+    if (nextType === 'MIXED') {
+      return;
+    }
 
     const currentDays = days || [];
     if (currentDays.length === 0 || nights.length === 0) return;
@@ -439,13 +452,13 @@ export function StepAccommodation() {
       <div>
         <h2 className="text-lg font-semibold">Noclegi</h2>
         <p className="text-sm text-muted-foreground">
-          Wybierz typ dla każdej nocy. Górny wybór zastosuje jeden typ do wszystkich.
+          Wybierz typ dla każdej nocy. Tryb mieszany pozwala laczyc rozne typy i rachunki.
         </p>
       </div>
 
       {/* Global accommodation type */}
       <div className="space-y-2">
-        <Label>Typ noclegu (zastosuj do wszystkich) *</Label>
+        <Label>Tryb noclegu (globalnie) *</Label>
         <Select
           value={globalAccommodationType}
           onValueChange={handleAccommodationTypeChange}
@@ -454,7 +467,7 @@ export function StepAccommodation() {
             <SelectValue placeholder="Wybierz typ noclegu" />
           </SelectTrigger>
           <SelectContent>
-            {ACCOMMODATION_TYPES.map((t) => (
+            {GLOBAL_ACCOMMODATION_TYPES.map((t) => (
               <SelectItem key={t.value} value={t.value}>
                 {t.label}
               </SelectItem>
@@ -463,7 +476,8 @@ export function StepAccommodation() {
         </Select>
       </div>
 
-      {globalAccommodationType === 'RECEIPT' && nights.length > 0 && (
+      {(globalAccommodationType === 'RECEIPT' || globalAccommodationType === 'MIXED') &&
+        nights.length > 0 && (
         <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
           <h3 className="text-sm font-medium">
             Rachunek zbiorczy (automatyczny podzial kwoty)
@@ -560,7 +574,7 @@ export function StepAccommodation() {
           </h3>
 
           {nights.map((nightDate, idx) => {
-            const nightType = nightTypes[idx] ?? globalAccommodationType;
+            const nightType = nightTypes[idx] ?? defaultNightType;
 
             return (
               <div
@@ -583,7 +597,7 @@ export function StepAccommodation() {
                     <SelectValue placeholder="Typ noclegu" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ACCOMMODATION_TYPES.map((t) => (
+                    {NIGHT_ACCOMMODATION_TYPES.map((t) => (
                       <SelectItem key={t.value} value={t.value}>
                         {t.label}
                       </SelectItem>

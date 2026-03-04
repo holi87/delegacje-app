@@ -60,6 +60,43 @@ function toNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
+function resolveApiAccommodationType(data: DelegationFormValues): 'RECEIPT' | 'LUMP_SUM' | 'FREE' | 'NONE' {
+  if (data.accommodationType !== 'MIXED') {
+    return data.accommodationType;
+  }
+
+  const nonEmptyTypes = data.days
+    .map((d) => d.accommodationType)
+    .filter((type) => type !== 'NONE');
+
+  if (nonEmptyTypes.length === 0) {
+    return 'NONE';
+  }
+
+  const firstType = nonEmptyTypes[0];
+  const isSingleType = nonEmptyTypes.every((type) => type === firstType);
+  return isSingleType ? firstType : 'NONE';
+}
+
+function inferFormAccommodationType(delegation: any): DelegationFormValues['accommodationType'] {
+  const nonEmptyTypes = (delegation.days ?? [])
+    .map((d: any) => d?.accommodationType)
+    .filter((type: any) =>
+      type === 'RECEIPT' || type === 'LUMP_SUM' || type === 'FREE'
+    );
+
+  if (nonEmptyTypes.length === 0) {
+    return (delegation.accommodationType ?? 'NONE') as DelegationFormValues['accommodationType'];
+  }
+
+  const uniqueTypes = Array.from(new Set(nonEmptyTypes));
+  if (uniqueTypes.length > 1) {
+    return 'MIXED';
+  }
+
+  return uniqueTypes[0] as DelegationFormValues['accommodationType'];
+}
+
 function buildApiPayload(data: DelegationFormValues) {
   const proposedNumber = data.proposedNumber?.trim();
 
@@ -79,7 +116,7 @@ function buildApiPayload(data: DelegationFormValues) {
       : null,
     transportType: data.transportType,
     vehicleType: data.mileageDetails?.vehicleType ?? null,
-    accommodationType: data.accommodationType,
+    accommodationType: resolveApiAccommodationType(data),
     advanceAmount: parseDecimal(data.advanceAmount || '0', 'advanceAmount'),
     days: data.days.map((d) => ({
       dayNumber: d.dayNumber,
@@ -135,7 +172,7 @@ function mapDelegationToFormValues(delegation: any): DelegationFormValues {
       ? toDateTimeLocalValue(delegation.borderCrossingIn)
       : null,
     transportType: delegation.transportType ?? 'COMPANY_VEHICLE',
-    accommodationType: delegation.accommodationType ?? 'NONE',
+    accommodationType: inferFormAccommodationType(delegation),
     advanceAmount: String(delegation.advanceAmount ?? '0'),
     days: [...(delegation.days ?? [])]
       .sort((a: any, b: any) => a.dayNumber - b.dayNumber)

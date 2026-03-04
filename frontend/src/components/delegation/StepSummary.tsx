@@ -47,6 +47,24 @@ function parseOptionalDecimal(
   return parseDecimal(value, fieldName);
 }
 
+function resolveApiAccommodationType(data: DelegationFormValues): 'RECEIPT' | 'LUMP_SUM' | 'FREE' | 'NONE' {
+  if (data.accommodationType !== 'MIXED') {
+    return data.accommodationType;
+  }
+
+  const nonEmptyTypes = data.days
+    .map((d) => d.accommodationType)
+    .filter((type) => type !== 'NONE');
+
+  if (nonEmptyTypes.length === 0) {
+    return 'NONE';
+  }
+
+  const firstType = nonEmptyTypes[0];
+  const isSingleType = nonEmptyTypes.every((type) => type === firstType);
+  return isSingleType ? firstType : 'NONE';
+}
+
 function toNumber(value: string | number | null | undefined): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   const parsed = Number(String(value ?? '').replace(',', '.'));
@@ -621,7 +639,7 @@ function buildApiPayload(data: DelegationFormValues) {
       : null,
     transportType: data.transportType,
     vehicleType: data.mileageDetails?.vehicleType ?? null,
-    accommodationType: data.accommodationType,
+    accommodationType: resolveApiAccommodationType(data),
     advanceAmount: parseDecimal(data.advanceAmount || '0', 'advanceAmount'),
     days: data.days.map((d) => ({
       dayNumber: d.dayNumber,

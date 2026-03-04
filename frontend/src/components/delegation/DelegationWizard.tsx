@@ -84,7 +84,7 @@ export const delegationFormSchema = z
       'PRIVATE_VEHICLE',
       'MIXED',
     ]),
-    accommodationType: z.enum(['RECEIPT', 'LUMP_SUM', 'FREE', 'NONE']),
+    accommodationType: z.enum(['RECEIPT', 'LUMP_SUM', 'FREE', 'NONE', 'MIXED']),
     advanceAmount: z.string().default('0'),
     days: z.array(delegationDaySchema),
     mileageDetails: mileageDetailsSchema.nullable().optional(),

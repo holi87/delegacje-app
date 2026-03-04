@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/table';
 import { UtensilsCrossed } from 'lucide-react';
 import type { DelegationFormValues } from './DelegationWizard';
+import type { AccommodationType } from '../../../../shared/types';
 
 /**
  * Calculate delegation days (doby delegacyjne) from departure/return.
@@ -141,6 +142,8 @@ export function StepMeals() {
   const delegationType = watch('type');
   const accommodationType = watch('accommodationType');
   const globalAccommodationType = accommodationType ?? 'NONE';
+  const defaultAccommodationType: AccommodationType =
+    globalAccommodationType === 'MIXED' ? 'NONE' : globalAccommodationType;
 
   const delegationDays = useMemo(
     () => calculateDelegationDays(departureAt, returnAt),
@@ -167,7 +170,7 @@ export function StepMeals() {
         isForeignSegmentInDay(dd.startDate, dd.endDate, borderCrossingOut, borderCrossingIn);
       const isAccommodationNight = idx < nightsCount;
       const resolvedAccommodationType = existing?.accommodationType
-        ?? (isAccommodationNight ? globalAccommodationType : 'NONE');
+        ?? (isAccommodationNight ? defaultAccommodationType : 'NONE');
       const resolvedAccommodationReceiptNumber =
         resolvedAccommodationType === 'RECEIPT'
           ? (existing?.accommodationReceiptNumber ?? null)

@@ -73,6 +73,7 @@ const ACCOMMODATION_LABELS: Record<string, string> = {
   LUMP_SUM: 'Ryczalt',
   FREE: 'Bezplatny',
   NONE: 'Brak',
+  MIXED: 'Mieszany',
 };
 
 const VEHICLE_LABELS: Record<string, string> = {
@@ -114,6 +115,32 @@ function formatDurationSummary(fullDays: number, remainingHours: number): string
   }
 
   return parts.length > 0 ? parts.join(', ') : '0 min';
+}
+
+function inferAccommodationTypeForDisplay(delegation: any): keyof typeof ACCOMMODATION_LABELS {
+  const nonEmptyTypes = (delegation?.days ?? [])
+    .map((day: any) => day?.accommodationType)
+    .filter((type: any) => type === 'RECEIPT' || type === 'LUMP_SUM' || type === 'FREE');
+
+  if (nonEmptyTypes.length === 0) {
+    const fallback = delegation?.accommodationType;
+    if (
+      fallback === 'RECEIPT' ||
+      fallback === 'LUMP_SUM' ||
+      fallback === 'FREE' ||
+      fallback === 'NONE'
+    ) {
+      return fallback;
+    }
+    return 'NONE';
+  }
+
+  const unique = new Set(nonEmptyTypes);
+  if (unique.size > 1) {
+    return 'MIXED';
+  }
+
+  return nonEmptyTypes[0];
 }
 
 export default function DelegationDetailPage() {
@@ -256,6 +283,7 @@ export default function DelegationDetailPage() {
 
   const delegation = delegationData.delegation ?? delegationData;
   const status = delegation.status as string;
+  const accommodationTypeForDisplay = inferAccommodationTypeForDisplay(delegation);
   const calc = normalizeCalculationResult(calculationData as ApiCalculationResult | undefined);
   const foreignCurrency = calc?.diet.foreignCurrency ?? delegation.foreignCurrency ?? null;
   const formatDietAmount = (value: string | number, isForeign: boolean) => {
@@ -428,8 +456,8 @@ export default function DelegationDetailPage() {
             <div>
               <span className="text-muted-foreground">Nocleg: </span>
               <span className="font-medium">
-                {ACCOMMODATION_LABELS[delegation.accommodationType] ??
-                  delegation.accommodationType}
+                {ACCOMMODATION_LABELS[accommodationTypeForDisplay] ??
+                  accommodationTypeForDisplay}
               </span>
             </div>
             {delegation.vehicleType && (
