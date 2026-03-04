@@ -19,6 +19,38 @@ function decimalToString(value: Prisma.Decimal | null | undefined): string | nul
   return value.toString();
 }
 
+type MileageVehicleType = 'CAR_ABOVE_900' | 'CAR_BELOW_900' | 'MOTORCYCLE' | 'MOPED';
+
+function normalizeEngineCapacityCm3(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.round(value);
+}
+
+function resolveMileageVehicleType(mileageDetails: {
+  vehicleType: MileageVehicleType;
+  engineCapacityCm3?: number | null;
+}): MileageVehicleType {
+  if (
+    mileageDetails.vehicleType === 'MOTORCYCLE' ||
+    mileageDetails.vehicleType === 'MOPED'
+  ) {
+    return mileageDetails.vehicleType;
+  }
+
+  const engineCapacityCm3 = normalizeEngineCapacityCm3(
+    mileageDetails.engineCapacityCm3
+  );
+
+  // Backward compatibility: keep existing explicit type when capacity is missing.
+  if (engineCapacityCm3 == null) {
+    return mileageDetails.vehicleType;
+  }
+
+  return engineCapacityCm3 > 900 ? 'CAR_ABOVE_900' : 'CAR_BELOW_900';
+}
+
 async function allocateDelegationNumber(tx: Prisma.TransactionClient): Promise<number> {
   await tx.delegationNumberCounter.upsert({
     where: { key: DELEGATION_NUMBER_COUNTER_KEY },
@@ -217,6 +249,7 @@ function serializeDelegation(delegation: any) {
       ? {
           id: delegation.mileageDetails.id,
           vehicleType: delegation.mileageDetails.vehicleType,
+          engineCapacityCm3: delegation.mileageDetails.engineCapacityCm3,
           vehiclePlate: delegation.mileageDetails.vehiclePlate,
           distanceKm: decimalToString(delegation.mileageDetails.distanceKm),
           ratePerKm: decimalToString(delegation.mileageDetails.ratePerKm),
@@ -309,6 +342,16 @@ export async function createDelegation(
   userId: string,
   input: CreateDelegationInput
 ) {
+  const resolvedMileageVehicleType = input.mileageDetails
+    ? resolveMileageVehicleType({
+        vehicleType: input.mileageDetails.vehicleType as MileageVehicleType,
+        engineCapacityCm3: input.mileageDetails.engineCapacityCm3 ?? null,
+      })
+    : null;
+  const engineCapacityCm3 = normalizeEngineCapacityCm3(
+    input.mileageDetails?.engineCapacityCm3
+  );
+
   const delegation = await prisma.$transaction(async (tx) => {
     const { numericNumber, numberLabel } = await resolveDelegationNumberLabelForCreate(tx, input);
 
@@ -324,7 +367,7 @@ export async function createDelegation(
         departureAt: new Date(input.departureAt),
         returnAt: new Date(input.returnAt),
         transportType: input.transportType as any,
-        vehicleType: input.vehicleType as any ?? null,
+        vehicleType: (resolvedMileageVehicleType ?? input.vehicleType) as any ?? null,
         transportNotes: input.transportNotes ?? null,
         accommodationType: input.accommodationType as any,
         advanceAmount: new Prisma.Decimal(input.advanceAmount),
@@ -355,7 +398,8 @@ export async function createDelegation(
           ? {
               mileageDetails: {
                 create: {
-                  vehicleType: input.mileageDetails.vehicleType as any,
+                  vehicleType: resolvedMileageVehicleType as any,
+                  engineCapacityCm3,
                   vehiclePlate: input.mileageDetails.vehiclePlate,
                   distanceKm: new Prisma.Decimal(input.mileageDetails.distanceKm),
                   ratePerKm: 0, // Will be set when calculation is run
@@ -425,6 +469,15 @@ export async function updateDelegation(
 
   // Build update data for the main delegation fields
   const updateData: Prisma.DelegationUpdateInput = {};
+  const resolvedMileageVehicleType = input.mileageDetails
+    ? resolveMileageVehicleType({
+        vehicleType: input.mileageDetails.vehicleType as MileageVehicleType,
+        engineCapacityCm3: input.mileageDetails.engineCapacityCm3 ?? null,
+      })
+    : null;
+  const engineCapacityCm3 = normalizeEngineCapacityCm3(
+    input.mileageDetails?.engineCapacityCm3
+  );
 
   if (input.purpose !== undefined) updateData.purpose = input.purpose;
   if (input.destination !== undefined) updateData.destination = input.destination;
@@ -439,6 +492,11 @@ export async function updateDelegation(
   if (input.foreignCountry !== undefined) updateData.foreignCountry = input.foreignCountry ?? null;
   if (input.borderCrossingOut !== undefined) updateData.borderCrossingOut = input.borderCrossingOut ? new Date(input.borderCrossingOut) : null;
   if (input.borderCrossingIn !== undefined) updateData.borderCrossingIn = input.borderCrossingIn ? new Date(input.borderCrossingIn) : null;
+  if (input.mileageDetails !== undefined) {
+    updateData.vehicleType = input.mileageDetails
+      ? (resolvedMileageVehicleType as any)
+      : null;
+  }
 
   // Use a transaction to atomically update delegation + related records
   const updated = await prisma.$transaction(async (tx) => {
@@ -481,7 +539,8 @@ export async function updateDelegation(
         await tx.mileageDetails.create({
           data: {
             delegationId,
-            vehicleType: input.mileageDetails.vehicleType as any,
+            vehicleType: resolvedMileageVehicleType as any,
+            engineCapacityCm3,
             vehiclePlate: input.mileageDetails.vehiclePlate,
             distanceKm: new Prisma.Decimal(input.mileageDetails.distanceKm),
             ratePerKm: 0,
@@ -877,6 +936,7 @@ function buildCalculationInput(delegation: any): CalculationInput {
     mileageDetails: delegation.mileageDetails
       ? {
           vehicleType: delegation.mileageDetails.vehicleType,
+          engineCapacityCm3: delegation.mileageDetails.engineCapacityCm3,
           vehiclePlate: delegation.mileageDetails.vehiclePlate,
           distanceKm: Number(delegation.mileageDetails.distanceKm.toString()),
         }
@@ -949,6 +1009,7 @@ function buildForeignCalculationInput(delegation: any): ForeignDelegationInput {
     mileageDetails: delegation.mileageDetails
       ? {
           vehicleType: delegation.mileageDetails.vehicleType,
+          engineCapacityCm3: delegation.mileageDetails.engineCapacityCm3,
           vehiclePlate: delegation.mileageDetails.vehiclePlate,
           distanceKm: Number(delegation.mileageDetails.distanceKm.toString()),
         }

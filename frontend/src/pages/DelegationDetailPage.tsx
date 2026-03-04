@@ -89,6 +89,19 @@ function toNumber(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatVehicleLabel(
+  vehicleType: string,
+  engineCapacityCm3?: string | number | null
+): string {
+  if (vehicleType === 'CAR_ABOVE_900' || vehicleType === 'CAR_BELOW_900') {
+    const capacity = Math.round(toNumber(engineCapacityCm3));
+    if (capacity > 0) {
+      return `Samochod osobowy (${capacity} cm\u00B3)`;
+    }
+  }
+  return VEHICLE_LABELS[vehicleType] ?? vehicleType;
+}
+
 function formatHoursOrMinutes(hours: number): string {
   const safeHours = Number.isFinite(hours) ? Math.max(0, hours) : 0;
   const totalMinutes = Math.round(safeHours * 60);
@@ -478,8 +491,10 @@ export default function DelegationDetailPage() {
               <div>
                 <span className="text-muted-foreground">Pojazd: </span>
                 <span className="font-medium">
-                  {VEHICLE_LABELS[delegation.vehicleType] ??
-                    delegation.vehicleType}
+                  {formatVehicleLabel(
+                    delegation.vehicleType,
+                    delegation.mileageDetails?.engineCapacityCm3 ?? null
+                  )}
                 </span>
               </div>
             )}

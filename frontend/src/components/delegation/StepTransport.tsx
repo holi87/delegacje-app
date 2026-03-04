@@ -20,8 +20,7 @@ const TRANSPORT_TYPES = [
 ] as const;
 
 const VEHICLE_TYPES = [
-  { value: 'CAR_ABOVE_900', label: 'Samochod > 900 cm\u00B3' },
-  { value: 'CAR_BELOW_900', label: 'Samochod \u2264 900 cm\u00B3' },
+  { value: 'CAR', label: 'Samochod osobowy' },
   { value: 'MOTORCYCLE', label: 'Motocykl' },
   { value: 'MOPED', label: 'Motorower' },
 ] as const;
@@ -36,10 +35,12 @@ export function StepTransport() {
   } = useFormContext<DelegationFormValues>();
 
   const transportType = watch('transportType');
+  const mileageVehicleKind = watch('mileageDetails.vehicleKind');
   const needsMileage =
     transportType === 'PRIVATE_VEHICLE' || transportType === 'MIXED';
   const needsReceipts =
     transportType === 'PUBLIC_TRANSPORT' || transportType === 'MIXED';
+  const isPassengerCar = mileageVehicleKind === 'CAR';
 
   const {
     fields: receiptFields,
@@ -58,7 +59,8 @@ export function StepTransport() {
       setValue('mileageDetails', null);
     } else if (!watch('mileageDetails')) {
       setValue('mileageDetails', {
-        vehicleType: 'CAR_ABOVE_900',
+        vehicleKind: 'CAR',
+        engineCapacityCm3: null,
         vehiclePlate: '',
         distanceKm: 0,
       });
@@ -109,17 +111,22 @@ export function StepTransport() {
           <h3 className="font-medium">Dane pojazdu i kilometrowka</h3>
 
           <div className="space-y-2">
-            <Label>Typ pojazdu *</Label>
+            <Label>Rodzaj pojazdu *</Label>
             <Controller
               control={control}
-              name="mileageDetails.vehicleType"
+              name="mileageDetails.vehicleKind"
               render={({ field }) => (
                 <Select
-                  value={field.value ?? 'CAR_ABOVE_900'}
-                  onValueChange={field.onChange}
+                  value={field.value ?? 'CAR'}
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    if (value !== 'CAR') {
+                      setValue('mileageDetails.engineCapacityCm3', null);
+                    }
+                  }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Wybierz typ pojazdu" />
+                    <SelectValue placeholder="Wybierz rodzaj pojazdu" />
                   </SelectTrigger>
                   <SelectContent>
                     {VEHICLE_TYPES.map((v) => (
@@ -132,6 +139,31 @@ export function StepTransport() {
               )}
             />
           </div>
+
+          {isPassengerCar && (
+            <div className="space-y-2">
+              <Label htmlFor="engineCapacityCm3">Pojemnosc silnika (cm3) *</Label>
+              <Input
+                id="engineCapacityCm3"
+                type="number"
+                min={1}
+                step={1}
+                placeholder="np. 1598"
+                {...register('mileageDetails.engineCapacityCm3', {
+                  setValueAs: (value) => {
+                    if (value === '' || value == null) return null;
+                    const parsed = Number(value);
+                    return Number.isFinite(parsed) ? parsed : null;
+                  },
+                })}
+              />
+              {errors.mileageDetails?.engineCapacityCm3 && (
+                <p className="text-sm text-destructive">
+                  {errors.mileageDetails.engineCapacityCm3.message}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">

@@ -2,7 +2,7 @@
 
 Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i wspólników spółki. Zgodna z polskim prawem.
 
-**Aktualna wersja:** `1.4.0` (2026-03-04)
+**Aktualna wersja:** `1.4.1` (2026-03-04)
 
 ## Funkcje
 
@@ -238,6 +238,19 @@ Stawki konfigurowane przez admina — przy zmianie przepisów wystarczy zaktuali
 ---
 
 ## Changelog
+
+### [1.4.1] - 2026-03-04
+- Kilometrówka auta prywatnego:
+  - W kreatorze delegacji usunięto ręczny wybór progu `<= 900` / `> 900` dla samochodu
+  - Dodano pole pojemności silnika (`cm3`) i automatyczny dobór stawki kilometrówki
+  - Dla motocykla i motoroweru zachowane zostało ręczne wskazanie typu pojazdu
+- Backend i baza danych:
+  - Dodano zapis pojemności silnika w `mileage_details` (`engine_capacity_cm3`)
+  - Kalkulacja krajowa i zagraniczna wybiera stawkę auta na podstawie wpisanej pojemności
+  - Zachowano kompatybilność ze starszymi delegacjami bez wpisanej pojemności
+- Widoki i dokumenty:
+  - Szczegóły delegacji i PDF pokazują pojemność silnika samochodu, jeśli jest dostępna
+- Wersja aplikacji podbita do `1.4.1` (frontend/backend/PDF)
 
 ### [1.4.0] - 2026-03-04
 - Noclegi i limity walutowe:

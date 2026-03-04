@@ -641,8 +641,44 @@ export function StepSummary({
 
 // ---------- Helpers ----------
 
+function normalizeEngineCapacityCm3(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.round(value);
+}
+
+function resolveMileageVehicleType(
+  mileageDetails: NonNullable<DelegationFormValues['mileageDetails']>
+): 'CAR_ABOVE_900' | 'CAR_BELOW_900' | 'MOTORCYCLE' | 'MOPED' {
+  if (mileageDetails.vehicleKind === 'MOTORCYCLE') {
+    return 'MOTORCYCLE';
+  }
+  if (mileageDetails.vehicleKind === 'MOPED') {
+    return 'MOPED';
+  }
+
+  const engineCapacityCm3 = normalizeEngineCapacityCm3(
+    mileageDetails.engineCapacityCm3
+  );
+  return engineCapacityCm3 != null && engineCapacityCm3 > 900
+    ? 'CAR_ABOVE_900'
+    : 'CAR_BELOW_900';
+}
+
 function buildApiPayload(data: DelegationFormValues) {
   const proposedNumber = data.proposedNumber?.trim();
+  const mileageDetails = data.mileageDetails
+    ? {
+        vehicleType: resolveMileageVehicleType(data.mileageDetails),
+        engineCapacityCm3:
+          data.mileageDetails.vehicleKind === 'CAR'
+            ? normalizeEngineCapacityCm3(data.mileageDetails.engineCapacityCm3)
+            : null,
+        vehiclePlate: data.mileageDetails.vehiclePlate,
+        distanceKm: data.mileageDetails.distanceKm,
+      }
+    : null;
 
   return {
     type: data.type ?? 'DOMESTIC',
@@ -659,7 +695,7 @@ function buildApiPayload(data: DelegationFormValues) {
       ? new Date(data.borderCrossingIn).toISOString()
       : null,
     transportType: data.transportType,
-    vehicleType: data.mileageDetails?.vehicleType ?? null,
+    vehicleType: mileageDetails?.vehicleType ?? null,
     accommodationType: resolveApiAccommodationType(data),
     advanceAmount: parseDecimal(data.advanceAmount || '0', 'advanceAmount'),
     days: data.days.map((d) => ({
@@ -683,13 +719,7 @@ function buildApiPayload(data: DelegationFormValues) {
           : null,
       isForeign: d.isForeign ?? false,
     })),
-    mileageDetails: data.mileageDetails
-      ? {
-          vehicleType: data.mileageDetails.vehicleType,
-          vehiclePlate: data.mileageDetails.vehiclePlate,
-          distanceKm: data.mileageDetails.distanceKm,
-        }
-      : null,
+    mileageDetails,
     transportReceipts: data.transportReceipts.map((r) => ({
       description: r.description,
       amount: parseDecimal(r.amount, 'transportReceipts.amount'),

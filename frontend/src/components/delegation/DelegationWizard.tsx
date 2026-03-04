@@ -62,7 +62,14 @@ const delegationDaySchema = z.object({
 });
 
 const mileageDetailsSchema = z.object({
-  vehicleType: z.enum(['CAR_ABOVE_900', 'CAR_BELOW_900', 'MOTORCYCLE', 'MOPED']),
+  vehicleKind: z.enum(['CAR', 'MOTORCYCLE', 'MOPED']),
+  engineCapacityCm3: z
+    .number()
+    .int('Pojemnosc silnika musi byc liczba calkowita')
+    .min(1, 'Pojemnosc silnika musi byc wieksza od 0')
+    .max(20000, 'Pojemnosc silnika jest nieprawidlowa')
+    .nullable()
+    .optional(),
   vehiclePlate: z.string().min(1, 'Nr rejestracyjny jest wymagany'),
   distanceKm: z.number().min(1, 'Dystans musi byc wiekszy niz 0'),
 });
@@ -135,6 +142,22 @@ export const delegationFormSchema = z
     }
   )
   .superRefine((data, ctx) => {
+    if (
+      (data.transportType === 'PRIVATE_VEHICLE' || data.transportType === 'MIXED') &&
+      data.mileageDetails?.vehicleKind === 'CAR'
+    ) {
+      if (
+        data.mileageDetails.engineCapacityCm3 == null ||
+        !Number.isFinite(data.mileageDetails.engineCapacityCm3)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['mileageDetails', 'engineCapacityCm3'],
+          message: 'Pojemnosc silnika jest wymagana dla samochodu',
+        });
+      }
+    }
+
     data.days.forEach((day, index) => {
       if (day.accommodationType !== 'RECEIPT') return;
 

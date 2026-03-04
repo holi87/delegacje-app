@@ -20,6 +20,7 @@ interface DayInput {
 
 interface MileageInput {
   vehicleType: 'CAR_ABOVE_900' | 'CAR_BELOW_900' | 'MOTORCYCLE' | 'MOPED';
+  engineCapacityCm3?: number | null;
   vehiclePlate: string;
   distanceKm: number;
 }
@@ -150,6 +151,24 @@ interface DomesticRateData {
 
 interface MileageRateData {
   ratePerKm: number;
+}
+
+function resolveMileageRateVehicleType(
+  mileageDetails: MileageInput
+): 'CAR_ABOVE_900' | 'CAR_BELOW_900' | 'MOTORCYCLE' | 'MOPED' {
+  if (
+    mileageDetails.vehicleType === 'MOTORCYCLE' ||
+    mileageDetails.vehicleType === 'MOPED'
+  ) {
+    return mileageDetails.vehicleType;
+  }
+
+  const engineCapacityCm3 = mileageDetails.engineCapacityCm3;
+  if (engineCapacityCm3 == null || !Number.isFinite(engineCapacityCm3) || engineCapacityCm3 <= 0) {
+    return mileageDetails.vehicleType;
+  }
+
+  return engineCapacityCm3 > 900 ? 'CAR_ABOVE_900' : 'CAR_BELOW_900';
 }
 
 /**
@@ -440,9 +459,10 @@ async function calculateTransport(
     (input.transportType === 'PRIVATE_VEHICLE' || input.transportType === 'MIXED') &&
     input.mileageDetails
   ) {
+    const rateVehicleType = resolveMileageRateVehicleType(input.mileageDetails);
     const mileageRate = await findMileageRate(
       prisma,
-      input.mileageDetails.vehicleType,
+      rateVehicleType,
       departureDate
     );
 

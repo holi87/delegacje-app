@@ -95,6 +95,7 @@ export interface DelegationDayInput {
 
 export interface MileageDetailsInput {
   vehicleType: VehicleType;
+  engineCapacityCm3?: number | null;
   vehiclePlate: string;
   distanceKm: number;
 }

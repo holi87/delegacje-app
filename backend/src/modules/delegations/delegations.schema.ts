@@ -47,6 +47,13 @@ const delegationDaySchema = z.object({
 
 const mileageDetailsSchema = z.object({
   vehicleType: vehicleTypeEnum,
+  engineCapacityCm3: z
+    .number()
+    .int('Pojemnosc silnika musi byc liczba calkowita')
+    .min(1, 'Pojemnosc silnika musi byc wieksza od 0')
+    .max(20000, 'Pojemnosc silnika jest nieprawidlowa')
+    .nullable()
+    .optional(),
   vehiclePlate: z.string().min(1, 'Numer rejestracyjny jest wymagany'),
   distanceKm: z.number().positive('Liczba kilometrów musi być większa od 0'),
 });

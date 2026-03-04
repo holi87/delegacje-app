@@ -36,6 +36,7 @@ interface DelegationDayData {
 
 interface MileageData {
   vehicleType: string;
+  engineCapacityCm3: number | null;
   vehiclePlate: string;
   distanceKm: Decimal;
   ratePerKm: Decimal;
@@ -314,7 +315,7 @@ const COLOR_GRAY = '#666666';
 const COLOR_LIGHT_GRAY = '#CCCCCC';
 const COLOR_HEADER_BG = '#F0F0F0';
 const APP_NAME = 'Delegacje-APP';
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const APP_REPOSITORY_URL = 'https://github.com/holi87/delegacje-app';
 
 // =====================
@@ -901,7 +902,18 @@ function renderTransportSection(
     doc.font(FONT_NORMAL).fontSize(FONT_SIZE_NORMAL);
 
     const vehicleLabel = vehicleTypeLabel(mileage.vehicleType);
-    doc.text(`Pojazd: ${vehicleLabel}, nr rej. ${mileage.vehiclePlate}`, MARGIN + 8, y);
+    const isPassengerCar =
+      mileage.vehicleType === 'CAR_ABOVE_900' ||
+      mileage.vehicleType === 'CAR_BELOW_900';
+    const capacityLabel =
+      isPassengerCar && mileage.engineCapacityCm3 != null
+        ? `, pojemnosc ${mileage.engineCapacityCm3} cm3`
+        : '';
+    doc.text(
+      `Pojazd: ${vehicleLabel}${capacityLabel}, nr rej. ${mileage.vehiclePlate}`,
+      MARGIN + 8,
+      y
+    );
     y += LINE_HEIGHT;
 
     const distKm = d2n(mileage.distanceKm);

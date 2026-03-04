@@ -587,6 +587,39 @@ describe('Foreign Delegation Calculation', () => {
       expect(result.transport.total).toBe(445);
     });
 
+    it('should choose <= 900 car mileage rate when engine capacity is 900 cm3', async () => {
+      const input: ForeignDelegationInput = {
+        departureAt: '2024-06-10T06:00:00.000Z',
+        returnAt: '2024-06-11T20:00:00.000Z',
+        borderCrossingOut: '2024-06-10T10:00:00.000Z',
+        borderCrossingIn: '2024-06-11T16:00:00.000Z',
+        foreignCountry: 'DE',
+        transportType: 'PRIVATE_VEHICLE',
+        advanceAmount: 0,
+        days: [
+          { dayNumber: 1, date: '2024-06-10', isForeign: true, breakfastProvided: false, lunchProvided: false, dinnerProvided: false, accommodationType: 'NONE', accommodationCost: null },
+        ],
+        mileageDetails: {
+          vehicleType: 'CAR_ABOVE_900',
+          engineCapacityCm3: 900,
+          vehiclePlate: 'WA 12345',
+          distanceKm: 50,
+        },
+        transportReceipts: [],
+        additionalCosts: [],
+      };
+
+      await calculateForeignDelegation(mockPrisma, input);
+
+      expect(mockPrisma.mileageRate.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            vehicleType: 'CAR_BELOW_900',
+          }),
+        })
+      );
+    });
+
     it('should sum transport receipts for public transport', async () => {
       const input: ForeignDelegationInput = {
         departureAt: '2024-06-10T06:00:00.000Z',

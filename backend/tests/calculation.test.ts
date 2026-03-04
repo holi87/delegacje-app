@@ -462,6 +462,37 @@ describe('calculateDelegation', () => {
       expect(result.transport.mileage!.total).toBe(713);
       expect(result.transport.total).toBe(713);
     });
+
+    it('should choose <= 900 car mileage rate when engine capacity is 900 cm3', async () => {
+      const mileageRateFindFirst = vi
+        .fn()
+        .mockResolvedValue(DEFAULT_MILEAGE_RATE_CAR_ABOVE_900);
+      prisma = {
+        ...createMockPrisma(),
+        mileageRate: { findFirst: mileageRateFindFirst },
+      } as unknown as PrismaClient;
+
+      const input = buildInput({
+        transportType: 'PRIVATE_VEHICLE',
+        vehicleType: 'CAR_ABOVE_900',
+        mileageDetails: {
+          vehicleType: 'CAR_ABOVE_900',
+          engineCapacityCm3: 900,
+          vehiclePlate: 'WA 12345',
+          distanceKm: 50,
+        },
+      });
+
+      await calculateDelegation(prisma, input);
+
+      expect(mileageRateFindFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            vehicleType: 'CAR_BELOW_900',
+          }),
+        })
+      );
+    });
   });
 
   // ------------------------------------------------------------------
