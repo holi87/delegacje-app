@@ -233,18 +233,22 @@ function accommodationTypeLabel(type: string): string {
 
 function formatHoursOrMinutes(hours: number): string {
   const safeHours = Number.isFinite(hours) ? Math.max(0, hours) : 0;
-  if (safeHours > 0 && safeHours < 1) {
-    return `${Math.round(safeHours * 60)} min`;
-  }
-  return formatDecimal(safeHours, 1);
+  const totalMinutes = Math.round(safeHours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h} h`;
+  return `${h} h ${m} min`;
 }
 
 /** Format duration as "X dob i Y godzin" */
 function formatDuration(departureAt: Date, returnAt: Date): string {
-  const totalMinutes = (returnAt.getTime() - departureAt.getTime()) / (1000 * 60);
-  const totalHours = totalMinutes / 60;
-  const fullDays = Math.floor(totalHours / 24);
-  const remainingHours = Math.round((totalHours - fullDays * 24) * 10) / 10;
+  const totalMinutes = Math.floor((returnAt.getTime() - departureAt.getTime()) / (1000 * 60));
+  const fullDays = Math.floor(totalMinutes / (24 * 60));
+  const minutesAfterFullDays = totalMinutes - fullDays * 24 * 60;
+  const remainingHours = Math.floor(minutesAfterFullDays / 60);
+  const remainingMinutes = minutesAfterFullDays - remainingHours * 60;
 
   const parts: string[] = [];
   if (fullDays > 0) {
@@ -257,11 +261,10 @@ function formatDuration(departureAt: Date, returnAt: Date): string {
     }
   }
   if (remainingHours > 0) {
-    if (remainingHours < 1) {
-      parts.push(`${Math.round(remainingHours * 60)} min`);
-    } else {
-      parts.push(`${formatDecimal(remainingHours, 1)} godz.`);
-    }
+    parts.push(`${remainingHours} h`);
+  }
+  if (remainingMinutes > 0) {
+    parts.push(`${remainingMinutes} min`);
   }
   if (parts.length === 0) {
     return '0 min';
@@ -310,7 +313,7 @@ const COLOR_GRAY = '#666666';
 const COLOR_LIGHT_GRAY = '#CCCCCC';
 const COLOR_HEADER_BG = '#F0F0F0';
 const APP_NAME = 'Delegacje-APP';
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 const APP_REPOSITORY_URL = 'https://github.com/holi87/delegacje-app';
 
 // =====================
@@ -1198,11 +1201,10 @@ function renderFooter(
   const now = new Date();
   const genDate = formatDateTimeInTimezone(now, 'Europe/Warsaw');
 
-  doc.text(`Dokument wygenerowany: ${genDate}`, MARGIN, footerY);
   doc.text(
     'Podstawa prawna: Rozporządzenie MPiPS z 25.10.2022 r. (Dz.U. 2022 poz. 2302)',
     MARGIN,
-    footerY + 9,
+    footerY,
     {
       width: CONTENT_WIDTH,
       lineBreak: false,
@@ -1210,9 +1212,9 @@ function renderFooter(
   );
   doc.font(FONT_NORMAL).fontSize(FONT_SIZE_FOOTER_META).fillColor(COLOR_GRAY);
   doc.text(
-    `Wygenerowano w ${APP_NAME} v${APP_VERSION} / ${APP_REPOSITORY_URL}`,
+    `Dokument wygenerowany: ${genDate} | Wygenerowano w ${APP_NAME} v${APP_VERSION} / ${APP_REPOSITORY_URL}`,
     MARGIN,
-    footerY + 18,
+    footerY + 9,
     {
       width: CONTENT_WIDTH,
       lineBreak: false,

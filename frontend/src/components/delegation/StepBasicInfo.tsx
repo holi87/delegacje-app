@@ -31,11 +31,11 @@ function formatDuration(departureAt: string, returnAt: string): string | null {
 
   const diffMs = ret.getTime() - dep.getTime();
   const totalMinutes = Math.floor(diffMs / 60000);
-  const totalHours = totalMinutes / 60;
 
-  const fullDays = Math.floor(totalHours / 24);
-  const remainingHours = Math.floor(totalHours - fullDays * 24);
-  const remainingMinutes = totalMinutes - Math.floor(totalHours) * 60;
+  const fullDays = Math.floor(totalMinutes / (24 * 60));
+  const minutesAfterFullDays = totalMinutes - fullDays * 24 * 60;
+  const remainingHours = Math.floor(minutesAfterFullDays / 60);
+  const remainingMinutes = minutesAfterFullDays - remainingHours * 60;
 
   const parts: string[] = [];
   if (fullDays > 0) {
@@ -52,9 +52,8 @@ function formatDuration(departureAt: string, returnAt: string): string | null {
         : 'godzin';
     parts.push(`${remainingHours} ${hoursLabel}`);
   }
-  if (remainingMinutes > 0 && fullDays === 0) {
-    const minLabel = 'min';
-    parts.push(`${remainingMinutes} ${minLabel}`);
+  if (remainingMinutes > 0) {
+    parts.push(`${remainingMinutes} min`);
   }
 
   if (parts.length === 0) return null;

@@ -2,7 +2,7 @@
 
 Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i wspólników spółki. Zgodna z polskim prawem.
 
-**Aktualna wersja:** `1.3.0` (2026-03-04)
+**Aktualna wersja:** `1.3.1` (2026-03-04)
 
 ## Funkcje
 
@@ -12,7 +12,7 @@ Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i
 - Obliczanie diet wg aktualnych stawek (konfigurowalne w panelu admina)
 - Delegacje zagraniczne: dwuodcinkowy model (krajowy + zagraniczny), stawki per kraj
 - Kilometrówka z wyborem typu pojazdu
-- Rozliczanie noclegów (wg rachunku / ryczałt)
+- Rozliczanie noclegów (wg rachunku / ryczałt / mieszany)
 - Koszty dodatkowe (parkingi, autostrady, inne)
 - Pomniejszanie diet za zapewnione posiłki
 - Generowanie PDF z pełnym rozliczeniem (do podpisu)
@@ -198,8 +198,8 @@ SZKIC → ZŁOŻONA → ROZLICZONA
 
 1. Delegowany tworzy delegację (wypełnia wizard krokowy)
 2. Zapisuje jako szkic lub od razu składa
-3. Admin weryfikuje i oznacza jako "Rozliczona"
-4. Delegowany pobiera PDF, drukuje, podpisuje
+3. Po złożeniu delegacji PDF jest dostępny do pobrania (druk/podpis)
+4. Admin weryfikuje i oznacza jako "Rozliczona"
 5. Podpisany dokument przechowywany poza aplikacją (DMS)
 
 ### Generowanie PDF
@@ -230,11 +230,25 @@ Stawki konfigurowane przez admina — przy zmianie przepisów wystarczy zaktuali
 
 ## Licencja
 
-Własnościowa / wewnętrzna. Do użytku w ramach spółki.
+`Delegacje-APP Free Use No Modification License v1.0` (plik [LICENSE](LICENSE)).
+
+- Dozwolone: bezpłatne używanie aplikacji i wdrażanie bez modyfikacji kodu.
+- Niedozwolone: modyfikowanie kodu źródłowego i rozpowszechnianie wersji zmodyfikowanych.
 
 ---
 
 ## Changelog
+
+### [1.3.1] - 2026-03-04
+- Czas trwania:
+  - UI (ekrany formularza i szczegóły delegacji): pokazuje minuty, bez ucinania części minutowej
+  - PDF: czas trwania przeliczany na `X h Y min` (zamiast ułamka godziny, np. `18,1 godz.`)
+- PDF:
+  - Przeniesienie metki aplikacji do linii `Dokument wygenerowany ... | Wygenerowano w ...`
+  - Zamiana kolejności stopki: podstawa prawna jest wyżej, linia generowania poniżej
+- Workflow:
+  - Przycisk `Pobierz PDF` dostępny już dla statusu `Złożona` (nie tylko `Rozliczona`)
+- Wersja aplikacji podbita do `1.3.1` (frontend/backend/PDF)
 
 ### [1.3.0] - 2026-03-04
 - Noclegi (duza przebudowa UX):

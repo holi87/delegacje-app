@@ -73,15 +73,13 @@ function toNumber(value: string | number | null | undefined): number {
 
 function formatHoursOrMinutes(hours: number): string {
   const safeHours = Number.isFinite(hours) ? Math.max(0, hours) : 0;
-  if (safeHours > 0 && safeHours < 1) {
-    return `${Math.round(safeHours * 60)} min`;
-  }
-  const rounded = Math.round(safeHours * 10) / 10;
-  const decimals = Number.isInteger(rounded) ? 0 : 1;
-  return `${rounded.toLocaleString('pl-PL', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })} h`;
+  const totalMinutes = Math.round(safeHours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h} h`;
+  return `${h} h ${m} min`;
 }
 
 function formatDurationSummary(fullDays: number, remainingHours: number): string {
