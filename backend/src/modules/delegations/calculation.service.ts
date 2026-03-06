@@ -18,11 +18,18 @@ interface DayInput {
   accommodationCurrency?: string | null;
 }
 
+interface MileageSegmentInput {
+  date: string;
+  startLocation: string;
+  endLocation: string;
+  km: number;
+}
+
 interface MileageInput {
   vehicleType: 'CAR_ABOVE_900' | 'CAR_BELOW_900' | 'MOTORCYCLE' | 'MOPED';
   engineCapacityCm3?: number | null;
   vehiclePlate: string;
-  distanceKm: number;
+  segments: MileageSegmentInput[];
 }
 
 interface TransportReceiptInput {
@@ -91,6 +98,7 @@ interface MileageResult {
   distanceKm: number;
   ratePerKm: number;
   total: number;
+  segments: MileageSegmentInput[];
 }
 
 interface TransportResult {
@@ -466,13 +474,15 @@ async function calculateTransport(
       departureDate
     );
 
-    const distanceKm = input.mileageDetails.distanceKm;
+    const segments = input.mileageDetails.segments;
+    const distanceKm = round2(segments.reduce((sum, s) => sum + s.km, 0));
     mileageTotal = round2(distanceKm * mileageRate.ratePerKm);
 
     mileage = {
       distanceKm,
       ratePerKm: mileageRate.ratePerKm,
       total: mileageTotal,
+      segments,
     };
   }
 

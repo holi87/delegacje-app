@@ -2,7 +2,7 @@
 
 Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i wspólników spółki. Zgodna z polskim prawem.
 
-**Aktualna wersja:** `1.4.1` (2026-03-04)
+**Aktualna wersja:** `1.5.0` (2026-03-06)
 
 ## Funkcje
 
@@ -11,7 +11,7 @@ Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i
 - Opcjonalny własny numer delegacji podawany przez użytkownika (z walidacją unikalności)
 - Obliczanie diet wg aktualnych stawek (konfigurowalne w panelu admina)
 - Delegacje zagraniczne: dwuodcinkowy model (krajowy + zagraniczny), stawki per kraj
-- Kilometrówka z wyborem typu pojazdu
+- Kilometrówka z odcinkami trasy (data, skąd, dokąd, km) i wyborem typu pojazdu
 - Rozliczanie noclegów (wg rachunku / ryczałt / mieszany)
 - Koszty dodatkowe (parkingi, autostrady, inne)
 - Pomniejszanie diet za zapewnione posiłki
@@ -238,6 +238,17 @@ Stawki konfigurowane przez admina — przy zmianie przepisów wystarczy zaktuali
 ---
 
 ## Changelog
+
+### [1.5.0] - 2026-03-06
+- Kilometrówka z odcinkami trasy:
+  - Zamiast jednego pola "dystans km" — dynamiczna lista odcinków (data, skąd, dokąd, km)
+  - Łączna liczba km jest sumą odcinków
+  - Nowy model `MileageSegment` (1:N od `MileageDetails`) w bazie danych
+  - Migracja z backfillem: istniejące dane przeniesione jako jeden odcinek
+  - Zaktualizowany formularz kreatorzy delegacji (StepTransport)
+  - Podgląd odcinków w podsumowaniu, szczegółach delegacji i PDF
+  - Testy jednostkowe zaktualizowane i rozszerzone o test sumowania odcinków
+- Wersja aplikacji podbita do `1.5.0`
 
 ### [1.4.1] - 2026-03-04
 - Kilometrówka auta prywatnego:

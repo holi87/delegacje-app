@@ -181,8 +181,24 @@ model MileageDetails {
   totalAmount  Decimal     @db.Decimal(10, 2) @map("total_amount")
 
   delegation Delegation @relation(fields: [delegationId], references: [id], onDelete: Cascade)
+  segments   MileageSegment[]
 
   @@map("mileage_details")
+}
+
+model MileageSegment {
+  id              String   @id @default(uuid())
+  mileageDetailsId String  @map("mileage_details_id")
+  segmentNumber   Int      @map("segment_number")
+  date            DateTime @db.Date
+  startLocation   String   @map("start_location")
+  endLocation     String   @map("end_location")
+  km              Decimal  @db.Decimal(10, 1)
+
+  mileageDetails MileageDetails @relation(fields: [mileageDetailsId], references: [id], onDelete: Cascade)
+
+  @@unique([mileageDetailsId, segmentNumber])
+  @@map("mileage_segments")
 }
 
 model TransportReceipt {

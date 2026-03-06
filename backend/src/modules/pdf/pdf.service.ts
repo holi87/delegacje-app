@@ -34,6 +34,14 @@ interface DelegationDayData {
   dietRate: Decimal | null;
 }
 
+interface MileageSegmentData {
+  segmentNumber: number;
+  date: Date;
+  startLocation: string;
+  endLocation: string;
+  km: Decimal;
+}
+
 interface MileageData {
   vehicleType: string;
   engineCapacityCm3: number | null;
@@ -41,6 +49,7 @@ interface MileageData {
   distanceKm: Decimal;
   ratePerKm: Decimal;
   totalAmount: Decimal;
+  segments?: MileageSegmentData[];
 }
 
 interface TransportReceiptData {
@@ -916,10 +925,37 @@ function renderTransportSection(
     );
     y += LINE_HEIGHT;
 
+    // Render segments table if available
+    const segments = mileage.segments ?? [];
+    if (segments.length > 0) {
+      y += 2;
+      const segTableWidth = CONTENT_WIDTH - 16;
+      const segColumns: TableColumn[] = [
+        { header: 'Nr', width: 30, align: 'center' },
+        { header: 'Data', width: 80, align: 'center' },
+        { header: 'Skąd', width: Math.floor((segTableWidth - 30 - 80 - 80) / 2), align: 'left' },
+        { header: 'Dokąd', width: Math.ceil((segTableWidth - 30 - 80 - 80) / 2), align: 'left' },
+        { header: 'km', width: 80, align: 'right' },
+      ];
+      const segRows: TableRow[] = segments.map((s, idx) => ({
+        cells: [
+          (idx + 1).toString(),
+          formatDate(s.date),
+          s.startLocation,
+          s.endLocation,
+          formatDecimal(d2n(s.km), 1),
+        ],
+      }));
+
+      y = drawTable(doc, MARGIN + 8, y, segColumns, segRows);
+      y += 4;
+    }
+
     const distKm = d2n(mileage.distanceKm);
     const rateKm = d2n(mileage.ratePerKm);
     const mileageTotal = d2n(mileage.totalAmount);
 
+    doc.font(FONT_NORMAL).fontSize(FONT_SIZE_NORMAL);
     doc.text(`Dystans: ${formatDecimal(distKm, 1)} km`, MARGIN + 8, y);
     y += LINE_HEIGHT;
 
@@ -1269,7 +1305,11 @@ export async function generateDelegationPdf(
       user: { include: { profile: true } },
       days: { orderBy: { dayNumber: 'asc' } },
       additionalCosts: true,
-      mileageDetails: true,
+      mileageDetails: {
+        include: {
+          segments: { orderBy: { segmentNumber: 'asc' } },
+        },
+      },
       transportReceipts: true,
     },
   });

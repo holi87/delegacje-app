@@ -132,7 +132,12 @@ function buildApiPayload(data: DelegationFormValues) {
             ? normalizeEngineCapacityCm3(data.mileageDetails.engineCapacityCm3)
             : null,
         vehiclePlate: data.mileageDetails.vehiclePlate,
-        distanceKm: data.mileageDetails.distanceKm,
+        segments: data.mileageDetails.segments.map((s) => ({
+          date: s.date,
+          startLocation: s.startLocation,
+          endLocation: s.endLocation,
+          km: s.km,
+        })),
       }
     : null;
 
@@ -240,7 +245,19 @@ function mapDelegationToFormValues(delegation: any): DelegationFormValues {
               ? 901
               : 900,
           vehiclePlate: delegation.mileageDetails.vehiclePlate ?? '',
-          distanceKm: toNumber(delegation.mileageDetails.distanceKm, 0),
+          segments: (delegation.mileageDetails.segments ?? []).length > 0
+            ? delegation.mileageDetails.segments.map((s: any) => ({
+                date: String(s.date ?? '').slice(0, 10),
+                startLocation: s.startLocation ?? '',
+                endLocation: s.endLocation ?? '',
+                km: toNumber(s.km, 0),
+              }))
+            : [{
+                date: '',
+                startLocation: '',
+                endLocation: '',
+                km: toNumber(delegation.mileageDetails.distanceKm, 0),
+              }],
         }
       : null,
     transportReceipts: (delegation.transportReceipts ?? []).map((r: any) => ({

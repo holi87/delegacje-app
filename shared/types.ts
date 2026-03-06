@@ -93,11 +93,18 @@ export interface DelegationDayInput {
   isForeign?: boolean;
 }
 
+export interface MileageSegmentInput {
+  date: string;
+  startLocation: string;
+  endLocation: string;
+  km: number;
+}
+
 export interface MileageDetailsInput {
   vehicleType: VehicleType;
   engineCapacityCm3?: number | null;
   vehiclePlate: string;
-  distanceKm: number;
+  segments: MileageSegmentInput[];
 }
 
 export interface TransportReceiptInput {
@@ -178,6 +185,7 @@ export interface CalculationResult {
       distanceKm: number;
       ratePerKm: string;
       total: string;
+      segments?: MileageSegmentInput[];
     };
     receipts: TransportReceiptInput[];
     localTransportLumpSum: string;
@@ -230,6 +238,7 @@ export interface ForeignCalculationResult {
       distanceKm: number;
       ratePerKm: string;
       total: string;
+      segments?: MileageSegmentInput[];
     };
     receipts: TransportReceiptInput[];
     localTransportLumpSum: string;

@@ -477,7 +477,33 @@ export function StepSummary({
         <h3 className="font-semibold">Transport</h3>
 
         {calc.transport.mileage && (
-          <div className="rounded-lg bg-muted/50 p-3 text-sm">
+          <div className="rounded-lg bg-muted/50 p-3 text-sm space-y-2">
+            {calc.transport.mileage.segments && calc.transport.mileage.segments.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-muted-foreground">
+                      <th className="pb-1 pr-2">Nr</th>
+                      <th className="pb-1 pr-2">Data</th>
+                      <th className="pb-1 pr-2">Skad</th>
+                      <th className="pb-1 pr-2">Dokad</th>
+                      <th className="pb-1 text-right">km</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {calc.transport.mileage.segments.map((s: any, idx: number) => (
+                      <tr key={idx} className="border-b last:border-0">
+                        <td className="py-1 pr-2">{idx + 1}</td>
+                        <td className="py-1 pr-2">{s.date}</td>
+                        <td className="py-1 pr-2">{s.startLocation}</td>
+                        <td className="py-1 pr-2">{s.endLocation}</td>
+                        <td className="py-1 text-right">{Number(s.km).toFixed(1)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <p>
               Kilometrowka: {calc.transport.mileage.distanceKm} km x{' '}
               {formatCurrency(calc.transport.mileage.ratePerKm)}/km ={' '}
@@ -676,7 +702,12 @@ function buildApiPayload(data: DelegationFormValues) {
             ? normalizeEngineCapacityCm3(data.mileageDetails.engineCapacityCm3)
             : null,
         vehiclePlate: data.mileageDetails.vehiclePlate,
-        distanceKm: data.mileageDetails.distanceKm,
+        segments: data.mileageDetails.segments.map((s) => ({
+          date: s.date,
+          startLocation: s.startLocation,
+          endLocation: s.endLocation,
+          km: s.km,
+        })),
       }
     : null;
 

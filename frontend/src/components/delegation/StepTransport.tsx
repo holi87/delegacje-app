@@ -51,6 +51,18 @@ export function StepTransport() {
     name: 'transportReceipts',
   });
 
+  const {
+    fields: segmentFields,
+    append: appendSegment,
+    remove: removeSegment,
+  } = useFieldArray({
+    control,
+    name: 'mileageDetails.segments',
+  });
+
+  const segments = watch('mileageDetails.segments') ?? [];
+  const totalKm = segments.reduce((sum, s) => sum + (Number(s?.km) || 0), 0);
+
   const handleTransportTypeChange = (value: string) => {
     setValue('transportType', value as DelegationFormValues['transportType']);
 
@@ -62,7 +74,7 @@ export function StepTransport() {
         vehicleKind: 'CAR',
         engineCapacityCm3: null,
         vehiclePlate: '',
-        distanceKm: 0,
+        segments: [{ date: '', startLocation: '', endLocation: '', km: 0 }],
       });
     }
   };
@@ -165,39 +177,146 @@ export function StepTransport() {
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="vehiclePlate">Nr rejestracyjny *</Label>
-              <Input
-                id="vehiclePlate"
-                placeholder="np. WA 12345"
-                {...register('mileageDetails.vehiclePlate')}
-              />
-              {errors.mileageDetails?.vehiclePlate && (
-                <p className="text-sm text-destructive">
-                  {errors.mileageDetails.vehiclePlate.message}
-                </p>
-              )}
+          <div className="space-y-2">
+            <Label htmlFor="vehiclePlate">Nr rejestracyjny *</Label>
+            <Input
+              id="vehiclePlate"
+              placeholder="np. WA 12345"
+              {...register('mileageDetails.vehiclePlate')}
+            />
+            {errors.mileageDetails?.vehiclePlate && (
+              <p className="text-sm text-destructive">
+                {errors.mileageDetails.vehiclePlate.message}
+              </p>
+            )}
+          </div>
+
+          {/* Mileage segments */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium">Odcinki trasy *</h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  appendSegment({
+                    date: '',
+                    startLocation: '',
+                    endLocation: '',
+                    km: 0,
+                  })
+                }
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Dodaj odcinek
+              </Button>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="distanceKm">Dystans (km) *</Label>
-              <Input
-                id="distanceKm"
-                type="number"
-                min={1}
-                step={1}
-                placeholder="np. 620"
-                {...register('mileageDetails.distanceKm', {
-                  valueAsNumber: true,
-                })}
-              />
-              {errors.mileageDetails?.distanceKm && (
-                <p className="text-sm text-destructive">
-                  {errors.mileageDetails.distanceKm.message}
-                </p>
-              )}
-            </div>
+            {segmentFields.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Brak dodanych odcinkow. Kliknij &quot;Dodaj odcinek&quot;, aby
+                dodac.
+              </p>
+            )}
+
+            {segmentFields.map((field, index) => (
+              <div
+                key={field.id}
+                className="grid gap-3 rounded-md border bg-muted/30 p-3 sm:grid-cols-[120px_1fr_1fr_100px_auto]"
+              >
+                <div className="space-y-1">
+                  <Label className="text-xs">Data</Label>
+                  <Input
+                    type="date"
+                    {...register(`mileageDetails.segments.${index}.date`)}
+                  />
+                  {errors.mileageDetails?.segments?.[index]?.date && (
+                    <p className="text-xs text-destructive">
+                      {errors.mileageDetails.segments[index]?.date?.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Skad</Label>
+                  <Input
+                    placeholder="np. Warszawa"
+                    {...register(
+                      `mileageDetails.segments.${index}.startLocation`
+                    )}
+                  />
+                  {errors.mileageDetails?.segments?.[index]?.startLocation && (
+                    <p className="text-xs text-destructive">
+                      {
+                        errors.mileageDetails.segments[index]?.startLocation
+                          ?.message
+                      }
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Dokad</Label>
+                  <Input
+                    placeholder="np. Krakow"
+                    {...register(
+                      `mileageDetails.segments.${index}.endLocation`
+                    )}
+                  />
+                  {errors.mileageDetails?.segments?.[index]?.endLocation && (
+                    <p className="text-xs text-destructive">
+                      {
+                        errors.mileageDetails.segments[index]?.endLocation
+                          ?.message
+                      }
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">km</Label>
+                  <Input
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    placeholder="0"
+                    {...register(`mileageDetails.segments.${index}.km`, {
+                      valueAsNumber: true,
+                    })}
+                  />
+                  {errors.mileageDetails?.segments?.[index]?.km && (
+                    <p className="text-xs text-destructive">
+                      {errors.mileageDetails.segments[index]?.km?.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeSegment(index)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {segmentFields.length > 0 && (
+              <div className="text-right text-sm font-medium">
+                Suma km: {totalKm.toFixed(1)}
+              </div>
+            )}
+
+            {errors.mileageDetails?.segments?.root && (
+              <p className="text-sm text-destructive">
+                {errors.mileageDetails.segments.root.message}
+              </p>
+            )}
           </div>
         </div>
       )}

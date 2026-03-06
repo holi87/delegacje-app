@@ -86,7 +86,12 @@ function buildApiPayload(data: DelegationFormValues) {
             ? normalizeEngineCapacityCm3(data.mileageDetails.engineCapacityCm3)
             : null,
         vehiclePlate: data.mileageDetails.vehiclePlate,
-        distanceKm: data.mileageDetails.distanceKm,
+        segments: data.mileageDetails.segments.map((s) => ({
+          date: s.date,
+          startLocation: s.startLocation,
+          endLocation: s.endLocation,
+          km: s.km,
+        })),
       }
     : null;
 

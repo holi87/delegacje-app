@@ -450,7 +450,7 @@ describe('calculateDelegation', () => {
         mileageDetails: {
           vehicleType: 'CAR_ABOVE_900',
           vehiclePlate: 'WA 12345',
-          distanceKm: 620,
+          segments: [{ date: '2026-03-10', startLocation: 'Warszawa', endLocation: 'Krakow', km: 620 }],
         },
       });
 
@@ -461,6 +461,31 @@ describe('calculateDelegation', () => {
       expect(result.transport.mileage!.ratePerKm).toBe(1.15);
       expect(result.transport.mileage!.total).toBe(713);
       expect(result.transport.total).toBe(713);
+    });
+
+    it('should sum multiple segments correctly', async () => {
+      const input = buildInput({
+        transportType: 'PRIVATE_VEHICLE',
+        vehicleType: 'CAR_ABOVE_900',
+        mileageDetails: {
+          vehicleType: 'CAR_ABOVE_900',
+          vehiclePlate: 'WA 12345',
+          segments: [
+            { date: '2026-03-10', startLocation: 'Warszawa', endLocation: 'Lodz', km: 130 },
+            { date: '2026-03-10', startLocation: 'Lodz', endLocation: 'Wroclaw', km: 210 },
+            { date: '2026-03-11', startLocation: 'Wroclaw', endLocation: 'Warszawa', km: 350 },
+          ],
+        },
+      });
+
+      const result = await calculateDelegation(prisma, input);
+
+      // 130 + 210 + 350 = 690 km
+      expect(result.transport.mileage).not.toBeNull();
+      expect(result.transport.mileage!.distanceKm).toBe(690);
+      // 690 * 1.15 = 793.50
+      expect(result.transport.mileage!.total).toBe(793.5);
+      expect(result.transport.mileage!.segments).toHaveLength(3);
     });
 
     it('should choose <= 900 car mileage rate when engine capacity is 900 cm3', async () => {
@@ -479,7 +504,7 @@ describe('calculateDelegation', () => {
           vehicleType: 'CAR_ABOVE_900',
           engineCapacityCm3: 900,
           vehiclePlate: 'WA 12345',
-          distanceKm: 50,
+          segments: [{ date: '2026-03-10', startLocation: 'A', endLocation: 'B', km: 50 }],
         },
       });
 
@@ -528,7 +553,7 @@ describe('calculateDelegation', () => {
         mileageDetails: {
           vehicleType: 'CAR_ABOVE_900',
           vehiclePlate: 'WA 12345',
-          distanceKm: 100,
+          segments: [{ date: '2026-03-10', startLocation: 'A', endLocation: 'B', km: 100 }],
         },
         transportReceipts: [
           { description: 'Bilet PKP', amount: 50.0, receiptNumber: 'R001' },
@@ -964,7 +989,7 @@ describe('calculateDelegation', () => {
         mileageDetails: {
           vehicleType: 'CAR_ABOVE_900',
           vehiclePlate: 'KR 98765',
-          distanceKm: 400,
+          segments: [{ date: '2026-03-10', startLocation: 'Krakow', endLocation: 'Wroclaw', km: 400 }],
         },
         additionalCosts: [
           {
@@ -1059,7 +1084,7 @@ describe('calculateDelegation', () => {
         mileageDetails: {
           vehicleType: 'CAR_ABOVE_900',
           vehiclePlate: 'WA 12345',
-          distanceKm: 100,
+          segments: [{ date: '2026-03-10', startLocation: 'A', endLocation: 'B', km: 100 }],
         },
       });
 
@@ -1080,7 +1105,7 @@ describe('calculateDelegation', () => {
         mileageDetails: {
           vehicleType: 'CAR_ABOVE_900',
           vehiclePlate: 'WA 12345',
-          distanceKm: 0,
+          segments: [{ date: '2026-03-10', startLocation: 'A', endLocation: 'A', km: 0 }],
         },
       });
 

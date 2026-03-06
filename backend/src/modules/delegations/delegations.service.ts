@@ -153,7 +153,11 @@ async function resolveDelegationNumberLabelForCreate(
 const fullDelegationInclude = {
   days: { orderBy: { dayNumber: 'asc' as const } },
   additionalCosts: true,
-  mileageDetails: true,
+  mileageDetails: {
+    include: {
+      segments: { orderBy: { segmentNumber: 'asc' as const } },
+    },
+  },
   transportReceipts: true,
   user: {
     select: {
@@ -254,6 +258,14 @@ function serializeDelegation(delegation: any) {
           distanceKm: decimalToString(delegation.mileageDetails.distanceKm),
           ratePerKm: decimalToString(delegation.mileageDetails.ratePerKm),
           totalAmount: decimalToString(delegation.mileageDetails.totalAmount),
+          segments: (delegation.mileageDetails.segments ?? []).map((s: any) => ({
+            id: s.id,
+            segmentNumber: s.segmentNumber,
+            date: s.date.toISOString().split('T')[0],
+            startLocation: s.startLocation,
+            endLocation: s.endLocation,
+            km: decimalToString(s.km),
+          })),
         }
       : null,
     transportReceipts: delegation.transportReceipts?.map((r: any) => ({
@@ -401,9 +413,20 @@ export async function createDelegation(
                   vehicleType: resolvedMileageVehicleType as any,
                   engineCapacityCm3,
                   vehiclePlate: input.mileageDetails.vehiclePlate,
-                  distanceKm: new Prisma.Decimal(input.mileageDetails.distanceKm),
+                  distanceKm: new Prisma.Decimal(
+                    input.mileageDetails.segments.reduce((sum, s) => sum + s.km, 0)
+                  ),
                   ratePerKm: 0, // Will be set when calculation is run
                   totalAmount: 0, // Will be set when calculation is run
+                  segments: {
+                    create: input.mileageDetails.segments.map((s, idx) => ({
+                      segmentNumber: idx + 1,
+                      date: new Date(s.date),
+                      startLocation: s.startLocation,
+                      endLocation: s.endLocation,
+                      km: new Prisma.Decimal(s.km),
+                    })),
+                  },
                 },
               },
             }
@@ -542,9 +565,20 @@ export async function updateDelegation(
             vehicleType: resolvedMileageVehicleType as any,
             engineCapacityCm3,
             vehiclePlate: input.mileageDetails.vehiclePlate,
-            distanceKm: new Prisma.Decimal(input.mileageDetails.distanceKm),
+            distanceKm: new Prisma.Decimal(
+              input.mileageDetails.segments.reduce((sum, s) => sum + s.km, 0)
+            ),
             ratePerKm: 0,
             totalAmount: 0,
+            segments: {
+              create: input.mileageDetails.segments.map((s, idx) => ({
+                segmentNumber: idx + 1,
+                date: new Date(s.date),
+                startLocation: s.startLocation,
+                endLocation: s.endLocation,
+                km: new Prisma.Decimal(s.km),
+              })),
+            },
           },
         });
       }
@@ -888,7 +922,11 @@ export async function calculateDelegationForPreview(
     where: { id: delegationId },
     include: {
       days: { orderBy: { dayNumber: 'asc' } },
-      mileageDetails: true,
+      mileageDetails: {
+        include: {
+          segments: { orderBy: { segmentNumber: 'asc' } },
+        },
+      },
       transportReceipts: true,
       additionalCosts: true,
     },
@@ -938,7 +976,12 @@ function buildCalculationInput(delegation: any): CalculationInput {
           vehicleType: delegation.mileageDetails.vehicleType,
           engineCapacityCm3: delegation.mileageDetails.engineCapacityCm3,
           vehiclePlate: delegation.mileageDetails.vehiclePlate,
-          distanceKm: Number(delegation.mileageDetails.distanceKm.toString()),
+          segments: (delegation.mileageDetails.segments ?? []).map((s: any) => ({
+            date: s.date.toISOString().split('T')[0],
+            startLocation: s.startLocation,
+            endLocation: s.endLocation,
+            km: Number(s.km.toString()),
+          })),
         }
       : null,
     transportReceipts: (delegation.transportReceipts ?? []).map((r: any) => ({
@@ -1011,7 +1054,12 @@ function buildForeignCalculationInput(delegation: any): ForeignDelegationInput {
           vehicleType: delegation.mileageDetails.vehicleType,
           engineCapacityCm3: delegation.mileageDetails.engineCapacityCm3,
           vehiclePlate: delegation.mileageDetails.vehiclePlate,
-          distanceKm: Number(delegation.mileageDetails.distanceKm.toString()),
+          segments: (delegation.mileageDetails.segments ?? []).map((s: any) => ({
+            date: s.date.toISOString().split('T')[0],
+            startLocation: s.startLocation,
+            endLocation: s.endLocation,
+            km: Number(s.km.toString()),
+          })),
         }
       : null,
     transportReceipts: (delegation.transportReceipts ?? []).map((r: any) => ({

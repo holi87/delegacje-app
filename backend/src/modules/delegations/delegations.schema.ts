@@ -45,6 +45,13 @@ const delegationDaySchema = z.object({
   isForeign: z.boolean().default(false),
 });
 
+const mileageSegmentSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data musi być w formacie YYYY-MM-DD'),
+  startLocation: z.string().min(1, 'Punkt startowy jest wymagany'),
+  endLocation: z.string().min(1, 'Punkt końcowy jest wymagany'),
+  km: z.number().positive('Liczba kilometrów musi być większa od 0'),
+});
+
 const mileageDetailsSchema = z.object({
   vehicleType: vehicleTypeEnum,
   engineCapacityCm3: z
@@ -55,7 +62,7 @@ const mileageDetailsSchema = z.object({
     .nullable()
     .optional(),
   vehiclePlate: z.string().min(1, 'Numer rejestracyjny jest wymagany'),
-  distanceKm: z.number().positive('Liczba kilometrów musi być większa od 0'),
+  segments: z.array(mileageSegmentSchema).min(1, 'Wymagany co najmniej jeden odcinek trasy'),
 });
 
 const transportReceiptSchema = z.object({

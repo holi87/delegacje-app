@@ -571,7 +571,7 @@ describe('Foreign Delegation Calculation', () => {
         mileageDetails: {
           vehicleType: 'CAR_ABOVE_900',
           vehiclePlate: 'WA 12345',
-          distanceKm: 500,
+          segments: [{ date: '2024-06-10', startLocation: 'Warszawa', endLocation: 'Berlin', km: 500 }],
         },
         transportReceipts: [],
         additionalCosts: [],
@@ -603,7 +603,7 @@ describe('Foreign Delegation Calculation', () => {
           vehicleType: 'CAR_ABOVE_900',
           engineCapacityCm3: 900,
           vehiclePlate: 'WA 12345',
-          distanceKm: 50,
+          segments: [{ date: '2024-06-10', startLocation: 'A', endLocation: 'B', km: 50 }],
         },
         transportReceipts: [],
         additionalCosts: [],
@@ -662,7 +662,7 @@ describe('Foreign Delegation Calculation', () => {
         mileageDetails: {
           vehicleType: 'CAR_ABOVE_900',
           vehiclePlate: 'WA 12345',
-          distanceKm: 200,
+          segments: [{ date: '2024-06-10', startLocation: 'A', endLocation: 'B', km: 200 }],
         },
         transportReceipts: [
           { description: 'Taxi', amount: 50, receiptNumber: null },
@@ -971,7 +971,7 @@ describe('Foreign Delegation Calculation', () => {
         mileageDetails: {
           vehicleType: 'CAR_ABOVE_900',
           vehiclePlate: 'WA 12345',
-          distanceKm: 100,
+          segments: [{ date: '2024-06-10', startLocation: 'A', endLocation: 'B', km: 100 }],
         },
         transportReceipts: [],
         additionalCosts: [],
@@ -1167,7 +1167,7 @@ describe('Foreign Delegation Calculation', () => {
         mileageDetails: {
           vehicleType: 'CAR_ABOVE_900',
           vehiclePlate: 'WA 12345',
-          distanceKm: 800,
+          segments: [{ date: '2024-06-10', startLocation: 'Warszawa', endLocation: 'Berlin', km: 800 }],
         },
         transportReceipts: [],
         additionalCosts: [
