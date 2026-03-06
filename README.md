@@ -2,7 +2,7 @@
 
 Webowa aplikacja do rozliczania delegacji służbowych dla członków zarządu i wspólników spółki. Zgodna z polskim prawem.
 
-**Aktualna wersja:** `1.5.0` (2026-03-06)
+**Aktualna wersja:** `1.5.1` (2026-03-06)
 
 ## Funkcje
 
@@ -238,6 +238,12 @@ Stawki konfigurowane przez admina — przy zmianie przepisów wystarczy zaktuali
 ---
 
 ## Changelog
+
+### [1.5.1] - 2026-03-06
+- Hotfix metki wersji w PDF:
+  - Stopka PDF pobiera wersję aplikacji dynamicznie z `backend/package.json`
+  - Usunięto ręcznie wpisaną wersję, która powodowała wyświetlanie `1.4.1` po wdrożeniu `1.5.0`
+- Wersja aplikacji podbita do `1.5.1` (frontend/backend/PDF)
 
 ### [1.5.0] - 2026-03-06
 - Kilometrówka z odcinkami trasy:

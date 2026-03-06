@@ -6,7 +6,7 @@
 #   3. Open http://localhost:8250
 #
 # To pin a specific version instead of latest:
-#   DELEGACJE_VERSION=v1.4.1 docker compose -f docker-compose.ghcr.yml up -d
+#   DELEGACJE_VERSION=v1.5.1 docker compose -f docker-compose.ghcr.yml up -d
 
 services:
   db:

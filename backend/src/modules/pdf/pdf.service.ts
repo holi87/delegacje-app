@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import type { Decimal } from '@prisma/client/runtime/library';
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { amountToWords } from './number-to-words.js';
 import { formatDelegationNumber } from '../../utils/delegation-number.js';
 
@@ -324,7 +324,20 @@ const COLOR_GRAY = '#666666';
 const COLOR_LIGHT_GRAY = '#CCCCCC';
 const COLOR_HEADER_BG = '#F0F0F0';
 const APP_NAME = 'Delegacje-APP';
-const APP_VERSION = '1.4.1';
+const APP_VERSION = (() => {
+  try {
+    const packageJsonRaw = readFileSync(
+      new URL('../../../package.json', import.meta.url),
+      'utf8'
+    );
+    const packageJson = JSON.parse(packageJsonRaw) as { version?: unknown };
+    return typeof packageJson.version === 'string'
+      ? packageJson.version
+      : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+})();
 const APP_REPOSITORY_URL = 'https://github.com/holi87/delegacje-app';
 
 // =====================
