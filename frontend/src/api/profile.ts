@@ -6,11 +6,12 @@ export interface Profile {
   position: string;
   defaultVehicle?: string | null;
   vehiclePlate?: string | null;
+  vehicleCapacity?: string | null;
 }
 
 export async function getProfile(): Promise<Profile> {
   const response = await apiClient.get('/profile');
-  return response.data;
+  return response.data.profile ?? response.data;
 }
 
 export async function updateProfile(data: Partial<Profile>): Promise<Profile> {

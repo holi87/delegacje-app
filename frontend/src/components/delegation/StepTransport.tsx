@@ -1,4 +1,5 @@
 import { useFormContext, useFieldArray, Controller } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
+import { getProfile } from '@/api/profile';
 import type { DelegationFormValues } from './DelegationWizard';
 
 const TRANSPORT_TYPES = [
@@ -25,6 +27,16 @@ const VEHICLE_TYPES = [
   { value: 'MOPED', label: 'Motorower' },
 ] as const;
 
+function resolveVehicleKindFromProfile(
+  defaultVehicle: string | null | undefined
+): 'CAR' | 'MOTORCYCLE' | 'MOPED' {
+  if (!defaultVehicle) return 'CAR';
+  if (defaultVehicle === 'MOTORCYCLE') return 'MOTORCYCLE';
+  if (defaultVehicle === 'MOPED') return 'MOPED';
+  // CAR_ABOVE_900, CAR_BELOW_900, or any other value → CAR
+  return 'CAR';
+}
+
 export function StepTransport() {
   const {
     register,
@@ -33,6 +45,12 @@ export function StepTransport() {
     setValue,
     formState: { errors },
   } = useFormContext<DelegationFormValues>();
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: getProfile,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const transportType = watch('transportType');
   const mileageVehicleKind = watch('mileageDetails.vehicleKind');
@@ -70,10 +88,19 @@ export function StepTransport() {
     if (value !== 'PRIVATE_VEHICLE' && value !== 'MIXED') {
       setValue('mileageDetails', null);
     } else if (!watch('mileageDetails')) {
+      // Auto-populate from user profile
+      const vehicleKind = resolveVehicleKindFromProfile(profile?.defaultVehicle);
+      const engineCapacity = profile?.vehicleCapacity
+        ? parseInt(profile.vehicleCapacity, 10)
+        : null;
+
       setValue('mileageDetails', {
-        vehicleKind: 'CAR',
-        engineCapacityCm3: null,
-        vehiclePlate: '',
+        vehicleKind,
+        engineCapacityCm3:
+          vehicleKind === 'CAR' && engineCapacity && Number.isFinite(engineCapacity)
+            ? engineCapacity
+            : null,
+        vehiclePlate: profile?.vehiclePlate ?? '',
         segments: [{ date: '', startLocation: '', endLocation: '', km: 0 }],
       });
     }

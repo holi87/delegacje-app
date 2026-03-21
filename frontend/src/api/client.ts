@@ -26,8 +26,9 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const { data } = await axios.post('/api/v1/auth/refresh', null, {
+        const { data } = await axios.post('/api/v1/auth/refresh', {}, {
           withCredentials: true,
+          headers: { 'Content-Type': 'application/json' },
         });
         useAuthStore.getState().setAccessToken(data.accessToken);
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;

@@ -18,6 +18,7 @@ const profileSchema = z.object({
   position: z.string().min(1, 'Stanowisko jest wymagane'),
   defaultVehicle: z.string().optional(),
   vehiclePlate: z.string().optional(),
+  vehicleCapacity: z.string().optional(),
 });
 
 const passwordSchema = z
@@ -56,6 +57,7 @@ export default function ProfilePage() {
         position: profile.position,
         defaultVehicle: profile.defaultVehicle ?? '',
         vehiclePlate: profile.vehiclePlate ?? '',
+        vehicleCapacity: profile.vehicleCapacity ?? '',
       });
     }
   }, [profile, profileForm]);
@@ -78,6 +80,7 @@ export default function ProfilePage() {
       position: data.position,
       defaultVehicle: data.defaultVehicle || null,
       vehiclePlate: data.vehiclePlate || null,
+      vehicleCapacity: data.vehicleCapacity || null,
     });
   };
 
@@ -154,7 +157,7 @@ export default function ProfilePage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="profile-defaultVehicle">Pojazd domyslny</Label>
               <Input
@@ -169,6 +172,14 @@ export default function ProfilePage() {
                 id="profile-vehiclePlate"
                 placeholder="np. WA 12345"
                 {...profileForm.register('vehiclePlate')}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-vehicleCapacity">Pojemnosc silnika (cm3)</Label>
+              <Input
+                id="profile-vehicleCapacity"
+                placeholder="np. 1598"
+                {...profileForm.register('vehicleCapacity')}
               />
             </div>
           </div>

@@ -283,7 +283,7 @@ export function StepSummary({
           <span className="text-muted-foreground">Wyjazd: </span>
           <span className="font-medium">
             {formData.departureAt
-              ? formatDateTime(new Date(formData.departureAt).toISOString())
+              ? formatDateTime(toISOWithOffset(formData.departureAt))
               : '---'}
           </span>
         </div>
@@ -291,7 +291,7 @@ export function StepSummary({
           <span className="text-muted-foreground">Powrot: </span>
           <span className="font-medium">
             {formData.returnAt
-              ? formatDateTime(new Date(formData.returnAt).toISOString())
+              ? formatDateTime(toISOWithOffset(formData.returnAt))
               : '---'}
           </span>
         </div>
@@ -692,6 +692,16 @@ function resolveMileageVehicleType(
     : 'CAR_BELOW_900';
 }
 
+function toISOWithOffset(dateStr: string): string {
+  const date = new Date(dateStr);
+  const offset = -date.getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  const hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+  const minutes = String(Math.abs(offset) % 60).padStart(2, '0');
+  const base = dateStr.length === 16 ? `${dateStr}:00` : dateStr;
+  return `${base}${sign}${hours}:${minutes}`;
+}
+
 function buildApiPayload(data: DelegationFormValues) {
   const proposedNumber = data.proposedNumber?.trim();
   const mileageDetails = data.mileageDetails
@@ -716,14 +726,14 @@ function buildApiPayload(data: DelegationFormValues) {
     proposedNumber: proposedNumber ? proposedNumber : null,
     purpose: data.purpose,
     destination: data.destination,
-    departureAt: new Date(data.departureAt).toISOString(),
-    returnAt: new Date(data.returnAt).toISOString(),
+    departureAt: toISOWithOffset(data.departureAt),
+    returnAt: toISOWithOffset(data.returnAt),
     foreignCountry: data.foreignCountry ?? null,
     borderCrossingOut: data.borderCrossingOut
-      ? new Date(data.borderCrossingOut).toISOString()
+      ? toISOWithOffset(data.borderCrossingOut)
       : null,
     borderCrossingIn: data.borderCrossingIn
-      ? new Date(data.borderCrossingIn).toISOString()
+      ? toISOWithOffset(data.borderCrossingIn)
       : null,
     transportType: data.transportType,
     vehicleType: mileageDetails?.vehicleType ?? null,
